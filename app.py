@@ -129,6 +129,16 @@ def setup_database():
     conn.commit()
     conn.close()
 
+    return "OK"
+
+
+# =========================
+# INITIALIZE DATABASE
+# =========================
+# This runs when Flask is loaded by Gunicorn on Render.
+
+setup_database()
+
 
 # =========================
 # LOGIN REQUIRED
@@ -1008,8 +1018,6 @@ def move_page(page_id):
 # =========================
 
 if __name__ == "__main__":
-
-    setup_database()
 
     if DATABASE_URL:
         print("🌐 MySpace V6 using PostgreSQL")
