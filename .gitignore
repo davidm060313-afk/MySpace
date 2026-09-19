@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+myspace.db
+data.db
+.env
