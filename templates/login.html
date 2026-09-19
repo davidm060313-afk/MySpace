@@ -3,7 +3,7 @@
 
 <head>
 
-    <title>Create MySpace Account</title>
+    <title>MySpace Login</title>
 
     <style>
 
@@ -37,6 +37,7 @@
             border: 1px solid #ccc;
             border-radius: 8px;
             font-size: 15px;
+            box-sizing: border-box;
         }
 
         button {
@@ -58,13 +59,14 @@
             margin-bottom: 15px;
         }
 
-        .login {
+        .register {
             text-align: center;
             margin-top: 18px;
         }
 
         a {
             color: #333;
+            font-weight: bold;
         }
 
     </style>
@@ -102,17 +104,17 @@
         >
 
         <button type="submit">
-            Create Account
+            Login
         </button>
 
     </form>
 
-    <div class="login">
+    <div class="register">
 
-        Already have an account?
+        Don't have an account?
 
-        <a href="/login">
-            Login
+        <a href="/register">
+            Create an account
         </a>
 
     </div>
