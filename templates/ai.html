@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>MyAI - MySpace</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5f5f7;
+    color: #222;
+}
+
+.header {
+    height: 64px;
+    background: white;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    justify-content: space-between;
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.links a {
+    margin-left: 18px;
+    text-decoration: none;
+    color: #555;
+}
+
+.links a:hover {
+    color: #000;
+}
+
+.chat {
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+}
+
+.title {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.title h1 {
+    margin-bottom: 5px;
+}
+
+.title p {
+    color: #777;
+}
+
+.messages {
+    min-height: 500px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 16px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.user {
+    background: #e8f0fe;
+    margin-left: 15%;
+}
+
+.ai {
+    background: #f0f0f0;
+    margin-right: 15%;
+}
+
+.input-area {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+textarea {
+    flex: 1;
+    min-height: 55px;
+    resize: vertical;
+    padding: 14px;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    font-size: 16px;
+}
+
+button {
+    padding: 0 24px;
+    border: none;
+    border-radius: 12px;
+    background: #222;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.8;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.sources {
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.sources a {
+    display: block;
+    margin-top: 5px;
+    color: #555;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+    <div class="logo">
+        MySpace
+    </div>
+
+    <div class="links">
+
+        <a href="/workspace">
+            Workspace
+        </a>
+
+        <a href="/ai">
+            🤖 MyAI
+        </a>
+
+        <a href="/logout">
+            Logout
+        </a>
+
+    </div>
+
+</div>
+
+
+<div class="chat">
+
+    <div class="title">
+
+        <h1>🤖 MyAI</h1>
+
+        <p>
+            Your AI assistant inside MySpace
+        </p>
+
+    </div>
+
+
+    <div
+        id="messages"
+        class="messages"
+    >
+
+        <div class="message ai">
+
+            Hi {{ username }}! 👋
+
+            I'm MyAI, your AI assistant inside MySpace.
+
+            I can answer questions, help with coding,
+            search the internet, explain schoolwork,
+            and much more.
+
+        </div>
+
+    </div>
+
+
+    <div class="input-area">
+
+        <textarea
+            id="message"
+            placeholder="Ask MyAI something..."
+            onkeydown="handleKey(event)"
+        ></textarea>
+
+        <button
+            id="sendButton"
+            onclick="sendMessage()"
+        >
+            Send
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const messages =
+    document.getElementById("messages");
+
+const input =
+    document.getElementById("message");
+
+const sendButton =
+    document.getElementById("sendButton");
+
+
+let history = [];
+
+
+function addMessage(
+    text,
+    type
+) {
+
+    const div =
+        document.createElement("div");
+
+    div.className =
+        "message " + type;
+
+    div.textContent = text;
+
+    messages.appendChild(div);
+
+    messages.scrollTop =
+        messages.scrollHeight;
+}
+
+
+function handleKey(event) {
+
+    if (
+        event.key === "Enter"
+        &&
+        !event.shiftKey
+    ) {
+
+        event.preventDefault();
+
+        sendMessage();
+    }
+}
+
+
+async function sendMessage() {
+
+    const message =
+        input.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+
+    addMessage(
+        message,
+        "user"
+    );
+
+
+    history.push({
+        role: "user",
+        content: message
+    });
+
+
+    input.value = "";
+
+    sendButton.disabled = true;
+
+    sendButton.textContent =
+        "Thinking...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/ai",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        message: message,
+                        history: history
+                    })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            addMessage(
+                "❌ " +
+                (
+                    data.error
+                    ||
+                    "Something went wrong."
+                ),
+                "ai"
+            );
+
+            return;
+        }
+
+
+        addMessage(
+            data.answer,
+            "ai"
+        );
+
+
+        history.push({
+            role: "assistant",
+            content: data.answer
+        });
+
+
+        if (
+            data.sources
+            &&
+            data.sources.length > 0
+        ) {
+
+            const sourceBox =
+                document.createElement("div");
+
+            sourceBox.className =
+                "message ai sources";
+
+            sourceBox.innerHTML =
+                "<strong>Sources:</strong>";
+
+            data.sources.forEach(
+                source => {
+
+                    const link =
+                        document.createElement("a");
+
+                    link.href =
+                        source.url;
+
+                    link.target =
+                        "_blank";
+
+                    link.rel =
+                        "noopener noreferrer";
+
+                    link.textContent =
+                        source.title;
+
+                    sourceBox.appendChild(
+                        link
+                    );
+                }
+            );
+
+            messages.appendChild(
+                sourceBox
+            );
+        }
+
+
+    } catch (error) {
+
+        addMessage(
+            "❌ Could not connect to MyAI.",
+            "ai"
+        );
+
+        console.error(error);
+
+    } finally {
+
+        sendButton.disabled =
+            false;
+
+        sendButton.textContent =
+            "Send";
+
+        input.focus();
+    }
+}
+
+</script>
+
+</body>
+
+</html>
