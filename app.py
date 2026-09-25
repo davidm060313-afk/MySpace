@@ -31,6 +31,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # ============================================================
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+print("MyAI Render API key loaded:", bool(GEMINI_API_KEY))
 
 SEARXNG_URL = os.environ.get(
     "SEARXNG_URL",
