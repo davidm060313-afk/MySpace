@@ -2,3 +2,6 @@ Flask
 gunicorn
 Werkzeug
 psycopg2-binary
+google-genai
+requests
+python-dotenv
