@@ -1,5 +1,10 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 import sqlite3
 import psycopg2
 import requests
