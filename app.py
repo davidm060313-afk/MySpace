@@ -4,6 +4,7 @@ import sqlite3
 import psycopg2
 import requests
 import time
+import traceback
 
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -1317,7 +1318,8 @@ mention the relevant source when appropriate.
                     last_error
                 )
 
-
+                traceback.print_exc()
+             
                 # Temporary overload
                 if (
                     "503" in last_error
