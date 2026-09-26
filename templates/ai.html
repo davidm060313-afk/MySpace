@@ -1,556 +1,844 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAI - MySpace</title>
 
-<meta charset="UTF-8">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-<meta name="viewport"
-   content="width=device-width, initial-scale=1.0">
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-<title>MyAI - MySpace</title>
+        .app {
+            display: flex;
+            height: 100vh;
+        }
 
-<style>
+        /* SIDEBAR */
 
-* {
-    box-sizing: border-box;
-}
+        .sidebar {
+            width: 270px;
+            background: #ffffff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
 
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f5f5f7;
-    color: #222;
-}
+        .sidebar-header {
+            padding: 18px;
+            border-bottom: 1px solid #ddd;
+        }
 
-.header {
-    height: 64px;
-    background: white;
-    border-bottom: 1px solid #ddd;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    justify-content: space-between;
-}
+        .brand {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
 
-.logo {
-    font-size: 22px;
-    font-weight: bold;
-}
+        .new-chat {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: #111827;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+        }
 
-.links a {
-    margin-left: 18px;
-    text-decoration: none;
-    color: #555;
-}
+        .new-chat:hover {
+            background: #374151;
+        }
 
-.links a:hover {
-    color: #000;
-}
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
 
-.chat {
-    max-width: 900px;
-    margin: 30px auto;
-    padding: 20px;
-}
+        .chat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px;
+            margin-bottom: 5px;
+            border-radius: 9px;
+            cursor: pointer;
+        }
 
-.title {
-    text-align: center;
-    margin-bottom: 25px;
-}
+        .chat-item:hover {
+            background: #f0f0f0;
+        }
 
-.title h1 {
-    margin-bottom: 5px;
-}
+        .chat-item.active {
+            background: #e5e7eb;
+        }
 
-.title p {
-    color: #777;
-}
+        .chat-title {
+            flex: 1;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
 
-.messages {
-    min-height: 500px;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 16px;
-    padding: 20px;
-    overflow-y: auto;
-}
+        .delete-chat {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0.6;
+        }
 
-.message {
-    margin-bottom: 18px;
-    padding: 14px 16px;
-    border-radius: 12px;
-    line-height: 1.5;
-}
+        .delete-chat:hover {
+            opacity: 1;
+        }
 
-.user {
-    background: #e8f0fe;
-    margin-left: 15%;
-    white-space: pre-wrap;
-}
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid #ddd;
+        }
 
-.ai {
-    background: #f0f0f0;
-    margin-right: 15%;
-}
+        .back-link {
+            display: block;
+            text-decoration: none;
+            color: #333;
+            padding: 10px;
+            border-radius: 8px;
+        }
 
-.ai a {
-    color: #1769aa;
-    text-decoration: underline;
-}
+        .back-link:hover {
+            background: #f0f0f0;
+        }
 
-.ai a:hover {
-    color: #0b4f7c;
-}
+        /* MAIN */
 
-.input-area {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
-}
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
 
-textarea {
-    flex: 1;
-    min-height: 55px;
-    resize: vertical;
-    padding: 14px;
-    border: 1px solid #ccc;
-    border-radius: 12px;
-    font-size: 16px;
-}
+        .topbar {
+            height: 65px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            padding: 0 22px;
+            font-size: 20px;
+            font-weight: bold;
+        }
 
-button {
-    padding: 0 24px;
-    border: none;
-    border-radius: 12px;
-    background: #222;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
-}
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px;
+        }
 
-button:hover {
-    opacity: 0.8;
-}
+        .welcome {
+            max-width: 700px;
+            margin: 60px auto;
+            text-align: center;
+        }
 
-button:disabled {
-    opacity: 0.5;
-    cursor: wait;
-}
+        .welcome h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
 
-.sources {
-    margin-top: 10px;
-    font-size: 13px;
-}
+        .welcome p {
+            color: #666;
+            font-size: 17px;
+        }
 
-.sources a {
-    display: block;
-    margin-top: 5px;
-    color: #555;
-}
+        .message {
+            max-width: 850px;
+            margin: 0 auto 18px auto;
+            display: flex;
+        }
 
-</style>
+        .message.user {
+            justify-content: flex-end;
+        }
 
+        .bubble {
+            max-width: 75%;
+            padding: 13px 16px;
+            border-radius: 15px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .user .bubble {
+            background: #111827;
+            color: white;
+        }
+
+        .assistant .bubble {
+            background: white;
+            border: 1px solid #ddd;
+            color: #222;
+        }
+
+        /* INPUT */
+
+        .input-area {
+            background: white;
+            border-top: 1px solid #ddd;
+            padding: 15px;
+        }
+
+        .input-box {
+            max-width: 900px;
+            margin: auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            resize: none;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            padding: 13px;
+            font-family: inherit;
+            font-size: 15px;
+            min-height: 48px;
+            max-height: 140px;
+            outline: none;
+        }
+
+        #messageInput:focus {
+            border-color: #888;
+        }
+
+        #sendButton {
+            border: none;
+            border-radius: 12px;
+            background: #111827;
+            color: white;
+            padding: 0 20px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        #sendButton:hover {
+            background: #374151;
+        }
+
+        #sendButton:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .typing {
+            color: #777;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 700px) {
+            .sidebar {
+                width: 210px;
+            }
+
+            .bubble {
+                max-width: 90%;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="header">
+<div class="app">
 
-```
-<div class="logo">
-    MySpace
-</div>
+    <!-- SIDEBAR -->
 
-<div class="links">
+    <aside class="sidebar">
 
-    <a href="/workspace">
-        Workspace
-    </a>
+        <div class="sidebar-header">
 
-    <a href="/ai">
-        🤖 MyAI
-    </a>
+            <div class="brand">
+                🧠 MyAI
+            </div>
 
-    <a href="/logout">
-        Logout
-    </a>
+            <button class="new-chat" onclick="newChat()">
+                ➕ New Chat
+            </button>
 
-</div>
-```
+        </div>
 
-</div>
+        <div id="chatList" class="chat-list">
+            <div style="padding:15px;color:#777;">
+                Loading chats...
+            </div>
+        </div>
 
-<div class="chat">
+        <div class="sidebar-footer">
 
-```
-<div class="title">
+            <a href="/" class="back-link">
+                ← Back to MySpace
+            </a>
 
-    <h1>🤖 MyAI</h1>
+        </div>
 
-    <p>
-        Your AI assistant inside MySpace
-    </p>
+    </aside>
 
-</div>
+    <!-- MAIN -->
 
+    <main class="main">
 
-<div
-    id="messages"
-    class="messages"
->
+        <div class="topbar">
+            🧠 MyAI
+        </div>
 
-    <div class="message ai">
+        <div id="messages" class="messages">
 
-        Hi {{ username }}! 👋
+            <div class="welcome" id="welcome">
 
-        I'm MyAI, your AI assistant inside MySpace.
+                <h1>👋 Hi{{ " " + username if username else "" }}!</h1>
 
-        I can answer questions, help with coding,
-        search the internet, explain schoolwork,
-        and much more.
+                <p>
+                    I'm MyAI, your AI assistant inside MySpace.
+                </p>
 
-    </div>
+                <p>
+                    Ask me anything, get help with coding,
+                    schoolwork, or search the internet.
+                </p>
 
-</div>
+            </div>
 
+        </div>
 
-<div class="input-area">
+        <div class="input-area">
 
-    <textarea
-        id="message"
-        placeholder="Ask MyAI something..."
-        onkeydown="handleKey(event)"
-    ></textarea>
+            <div class="input-box">
 
-    <button
-        id="sendButton"
-        onclick="sendMessage()"
-    >
-        Send
-    </button>
+                <textarea
+                    id="messageInput"
+                    placeholder="Message MyAI..."
+                    rows="1"
+                    onkeydown="handleKey(event)"
+                ></textarea>
 
-</div>
-```
+                <button id="sendButton" onclick="sendMessage()">
+                    Send
+                </button>
+
+            </div>
+
+        </div>
+
+    </main>
 
 </div>
 
 <script>
 
-const messages =
-    document.getElementById("messages");
-
-const input =
-    document.getElementById("message");
-
-const sendButton =
-    document.getElementById("sendButton");
+let currentConversationId = null;
+let sending = false;
 
 
-let history = [];
+/* =========================
+   LOAD CHAT LIST
+========================= */
 
+async function loadChats() {
 
-/*
-=================================
-SAFE MARKDOWN RENDERING
-=================================
-*/
+    try {
 
-function escapeHtml(text) {
+        const response = await fetch("/api/conversations");
 
-    const div =
-        document.createElement("div");
+        if (!response.ok) {
+            throw new Error("Could not load chats");
+        }
 
-    div.textContent = text;
+        const chats = await response.json();
 
-    return div.innerHTML;
-}
+        const list = document.getElementById("chatList");
 
+        list.innerHTML = "";
 
-function renderMarkdown(text) {
+        if (!chats.length) {
 
-    let html =
-        escapeHtml(text);
+            list.innerHTML = `
+                <div style="padding:15px;color:#777;">
+                    No chats yet.
+                </div>
+            `;
 
+            return;
+        }
 
-    /*
-    Markdown links:
+        chats.forEach(chat => {
 
-    [Google](https://google.com)
-    */
+            const item = document.createElement("div");
 
-    html = html.replace(
-        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
+            item.className = "chat-item";
 
+            if (chat.id === currentConversationId) {
+                item.classList.add("active");
+            }
 
-    /*
-    Bold:
+            item.innerHTML = `
+                <span>💬</span>
+                <span class="chat-title">${escapeHtml(chat.title)}</span>
+                <button
+                    class="delete-chat"
+                    onclick="deleteChat(event, ${chat.id})"
+                    title="Delete chat"
+                >
+                    🗑️
+                </button>
+            `;
 
-    **hello**
-    */
+            item.onclick = function() {
+                loadChat(chat.id);
+            };
 
-    html = html.replace(
-        /\*\*([^*]+)\*\*/g,
-        "<strong>$1</strong>"
-    );
+            list.appendChild(item);
 
+        });
 
-    /*
-    Italic:
+    } catch (error) {
 
-    *hello*
-    */
+        console.error(error);
 
-    html = html.replace(
-        /(?<!\*)\*([^*]+)\*(?!\*)/g,
-        "<em>$1</em>"
-    );
-
-
-    /*
-    Line breaks
-    */
-
-    html =
-        html.replace(/\n/g, "<br>");
-
-
-    return html;
-}
-
-
-/*
-=================================
-ADD MESSAGE
-=================================
-*/
-
-function addMessage(
-    text,
-    type
-) {
-
-    const div =
-        document.createElement("div");
-
-    div.className =
-        "message " + type;
-
-
-    if (type === "ai") {
-
-        div.innerHTML =
-            renderMarkdown(text);
-
-    } else {
-
-        div.textContent =
-            text;
-    }
-
-
-    messages.appendChild(div);
-
-    messages.scrollTop =
-        messages.scrollHeight;
-}
-
-
-/*
-=================================
-KEYBOARD
-=================================
-*/
-
-function handleKey(event) {
-
-    if (
-        event.key === "Enter"
-        &&
-        !event.shiftKey
-    ) {
-
-        event.preventDefault();
-
-        sendMessage();
+        document.getElementById("chatList").innerHTML = `
+            <div style="padding:15px;color:#c00;">
+                Could not load chats.
+            </div>
+        `;
     }
 }
 
 
-/*
-=================================
-SEND MESSAGE
-=================================
-*/
+/* =========================
+   NEW CHAT
+========================= */
+
+async function newChat() {
+
+    try {
+
+        const response = await fetch("/api/conversations", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                title: "New Chat"
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || "Could not create chat.");
+            return;
+        }
+
+        currentConversationId = data.id;
+
+        clearMessages();
+
+        await loadChats();
+
+        document.getElementById("messageInput").focus();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("Could not create a new chat.");
+
+    }
+}
+
+
+/* =========================
+   LOAD CHAT
+========================= */
+
+async function loadChat(id) {
+
+    try {
+
+        const response = await fetch(
+            `/api/conversations/${id}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || "Could not load chat.");
+            return;
+        }
+
+        currentConversationId = id;
+
+        const messages = document.getElementById("messages");
+
+        messages.innerHTML = "";
+
+        if (!data.messages.length) {
+
+            showWelcome();
+
+        } else {
+
+            data.messages.forEach(message => {
+
+                addMessage(
+                    message.role,
+                    message.content
+                );
+
+            });
+
+        }
+
+        await loadChats();
+
+        scrollToBottom();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("Could not load this chat.");
+
+    }
+}
+
+
+/* =========================
+   DELETE CHAT
+========================= */
+
+async function deleteChat(event, id) {
+
+    event.stopPropagation();
+
+    if (!confirm("Delete this chat?")) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `/api/conversations/${id}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || "Could not delete chat.");
+            return;
+        }
+
+        if (currentConversationId === id) {
+
+            currentConversationId = null;
+
+            clearMessages();
+
+        }
+
+        await loadChats();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("Could not delete chat.");
+
+    }
+}
+
+
+/* =========================
+   SEND MESSAGE
+========================= */
 
 async function sendMessage() {
 
-    const message =
-        input.value.trim();
+    if (sending) {
+        return;
+    }
+
+    const input = document.getElementById("messageInput");
+
+    const message = input.value.trim();
 
     if (!message) {
         return;
     }
 
+    sending = true;
 
-    addMessage(
-        message,
-        "user"
-    );
+    document.getElementById("sendButton").disabled = true;
 
+    if (!currentConversationId) {
 
-    history.push({
-        role: "user",
-        content: message
-    });
+        try {
 
-
-    input.value = "";
-
-    sendButton.disabled = true;
-
-    sendButton.textContent =
-        "Thinking...";
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/ai",
+            const response = await fetch(
+                "/api/conversations",
                 {
                     method: "POST",
-
                     headers: {
-                        "Content-Type":
-                            "application/json"
+                        "Content-Type": "application/json"
                     },
-
                     body: JSON.stringify({
-                        message: message,
-                        history: history
+                        title: message.substring(0, 50)
                     })
                 }
             );
 
+            const data = await response.json();
 
-        const data =
-            await response.json();
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Could not create chat"
+                );
+            }
 
+            currentConversationId = data.id;
 
-        if (!response.ok) {
+            await loadChats();
 
-            addMessage(
-                "❌ " +
-                (
-                    data.error
-                    ||
-                    "Something went wrong."
-                ),
-                "ai"
-            );
+        } catch (error) {
+
+            alert(error.message);
+
+            sending = false;
+
+            document.getElementById("sendButton").disabled = false;
 
             return;
         }
+    }
 
+    hideWelcome();
 
-        /*
-        =========================
-        AI ANSWER
-        =========================
-        */
+    addMessage("user", message);
 
-        addMessage(
-            data.answer,
-            "ai"
+    input.value = "";
+
+    const typing = document.createElement("div");
+
+    typing.className = "typing";
+
+    typing.id = "typing";
+
+    typing.textContent = "MyAI is thinking...";
+
+    document.getElementById("messages").appendChild(typing);
+
+    scrollToBottom();
+
+    try {
+
+        const response = await fetch(
+            "/api/ai",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: message,
+                    conversation_id: currentConversationId
+                })
+            }
         );
 
+        const data = await response.json();
 
-        history.push({
-            role: "assistant",
-            content: data.answer
-        });
+        const oldTyping = document.getElementById("typing");
 
+        if (oldTyping) {
+            oldTyping.remove();
+        }
 
-        /*
-        =========================
-        SOURCES
-        =========================
-        */
-
-        if (
-            data.sources
-            &&
-            data.sources.length > 0
-        ) {
-
-            const sourceBox =
-                document.createElement("div");
-
-            sourceBox.className =
-                "message ai sources";
-
-            sourceBox.innerHTML =
-                "<strong>Sources:</strong>";
-
-
-            data.sources.forEach(
-                source => {
-
-                    const link =
-                        document.createElement("a");
-
-                    link.href =
-                        source.url;
-
-                    link.target =
-                        "_blank";
-
-                    link.rel =
-                        "noopener noreferrer";
-
-                    link.textContent =
-                        source.title;
-
-                    sourceBox.appendChild(
-                        link
-                    );
-                }
-            );
-
-
-            messages.appendChild(
-                sourceBox
+        if (!response.ok) {
+            throw new Error(
+                data.error || "MyAI returned an error."
             );
         }
 
+        addMessage(
+            "assistant",
+            data.answer || "I didn't get an answer."
+        );
+
+        await loadChats();
 
     } catch (error) {
 
+        const oldTyping = document.getElementById("typing");
+
+        if (oldTyping) {
+            oldTyping.remove();
+        }
+
         addMessage(
-            "❌ Could not connect to MyAI.",
-            "ai"
+            "assistant",
+            "⚠️ " + error.message
         );
 
-        console.error(error);
-
-    } finally {
-
-        sendButton.disabled =
-            false;
-
-        sendButton.textContent =
-            "Send";
-
-        input.focus();
     }
+
+    sending = false;
+
+    document.getElementById("sendButton").disabled = false;
+
+    input.focus();
+
+    scrollToBottom();
 }
+
+
+/* =========================
+   ADD MESSAGE
+========================= */
+
+function addMessage(role, content) {
+
+    const messages = document.getElementById("messages");
+
+    const wrapper = document.createElement("div");
+
+    wrapper.className =
+        "message " +
+        (role === "user" ? "user" : "assistant");
+
+    const bubble = document.createElement("div");
+
+    bubble.className = "bubble";
+
+    bubble.textContent = content;
+
+    wrapper.appendChild(bubble);
+
+    messages.appendChild(wrapper);
+
+}
+
+
+/* =========================
+   CLEAR
+========================= */
+
+function clearMessages() {
+
+    document.getElementById("messages").innerHTML = "";
+
+    showWelcome();
+
+}
+
+
+function showWelcome() {
+
+    document.getElementById("messages").innerHTML = `
+        <div class="welcome" id="welcome">
+
+            <h1>👋 Hi{{ " " + username if username else "" }}!</h1>
+
+            <p>
+                I'm MyAI, your AI assistant inside MySpace.
+            </p>
+
+            <p>
+                Ask me anything, get help with coding,
+                schoolwork, or search the internet.
+            </p>
+
+        </div>
+    `;
+}
+
+
+function hideWelcome() {
+
+    const welcome = document.getElementById("welcome");
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+}
+
+
+/* =========================
+   ENTER KEY
+========================= */
+
+function handleKey(event) {
+
+    if (event.key === "Enter" && !event.shiftKey) {
+
+        event.preventDefault();
+
+        sendMessage();
+
+    }
+
+}
+
+
+/* =========================
+   SCROLL
+========================= */
+
+function scrollToBottom() {
+
+    const messages = document.getElementById("messages");
+
+    messages.scrollTop = messages.scrollHeight;
+
+}
+
+
+/* =========================
+   ESCAPE HTML
+========================= */
+
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+
+}
+
+
+/* =========================
+   START
+========================= */
+
+loadChats();
 
 </script>
 
 </body>
-
 </html>
