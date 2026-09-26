@@ -1,20 +1,9 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, session
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
 import sqlite3
 import psycopg2
-import requests
-import time
-import traceback
-
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from google import genai
-
 
 app = Flask(__name__)
 
@@ -26,69 +15,9 @@ app.secret_key = os.environ.get(
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
-# ============================================================
-# MYAI CONFIGURATION
-# ============================================================
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-print("MyAI Render API key loaded:", bool(GEMINI_API_KEY))
-
-SEARXNG_URL = os.environ.get(
-    "SEARXNG_URL",
-    "http://localhost:8080"
-)
-
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(
-        api_key=GEMINI_API_KEY
-    )
-else:
-    gemini_client = None
-
-
-# Gemini models
-AI_MODELS = [
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.7-flash",
-    "gemini-3.8-flash"
-]
-
-# ============================================================
-# MYAI SAFETY FILTER
-# ============================================================
-
-BLOCKED_PATTERNS = [
-    "steal a password",
-    "steal passwords",
-    "hack someone's account",
-    "hack someones account",
-    "bypass a password",
-    "make malware",
-    "create malware",
-    "write ransomware",
-    "make ransomware",
-    "steal credit card",
-    "steal someone's money",
-    "steal someones money"
-]
-
-
-def safety_check(message):
-
-    text = message.lower()
-
-    for pattern in BLOCKED_PATTERNS:
-
-        if pattern in text:
-            return False
-
-    return True
-
-
-# ============================================================
+# =========================
 # DATABASE
-# ============================================================
+# =========================
 
 def get_db():
 
@@ -97,12 +26,10 @@ def get_db():
 
     conn = sqlite3.connect("myspace.db")
     conn.row_factory = sqlite3.Row
-
     return conn
 
 
 def is_postgres():
-
     return bool(DATABASE_URL)
 
 
@@ -182,21 +109,18 @@ def setup_database():
         column_names = [column[1] for column in columns]
 
         if "icon" not in column_names:
-
             cursor.execute("""
                 ALTER TABLE pages
                 ADD COLUMN icon TEXT NOT NULL DEFAULT '📄'
             """)
 
         if "favorite" not in column_names:
-
             cursor.execute("""
                 ALTER TABLE pages
                 ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0
             """)
 
         if "folder_id" not in column_names:
-
             cursor.execute("""
                 ALTER TABLE pages
                 ADD COLUMN folder_id INTEGER
@@ -208,16 +132,17 @@ def setup_database():
     return "OK"
 
 
-# ============================================================
+# =========================
 # INITIALIZE DATABASE
-# ============================================================
+# =========================
+# This runs when Flask is loaded by Gunicorn on Render.
 
 setup_database()
 
 
-# ============================================================
+# =========================
 # LOGIN REQUIRED
-# ============================================================
+# =========================
 
 def login_required(function):
 
@@ -232,9 +157,9 @@ def login_required(function):
     return wrapper
 
 
-# ============================================================
+# =========================
 # HOME
-# ============================================================
+# =========================
 
 @app.route("/")
 def home():
@@ -245,9 +170,9 @@ def home():
     return redirect("/workspace")
 
 
-# ============================================================
+# =========================
 # REGISTER
-# ============================================================
+# =========================
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -342,9 +267,9 @@ def register():
     return render_template("register.html")
 
 
-# ============================================================
+# =========================
 # LOGIN
-# ============================================================
+# =========================
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -416,9 +341,9 @@ def login():
     return render_template("login.html")
 
 
-# ============================================================
+# =========================
 # LOGOUT
-# ============================================================
+# =========================
 
 @app.route("/logout")
 def logout():
@@ -428,9 +353,9 @@ def logout():
     return redirect("/login")
 
 
-# ============================================================
+# =========================
 # WORKSPACE
-# ============================================================
+# =========================
 
 @app.route("/workspace")
 @login_required
@@ -530,9 +455,9 @@ def workspace():
     )
 
 
-# ============================================================
+# =========================
 # OPEN PAGE
-# ============================================================
+# =========================
 
 @app.route("/page/<int:page_id>")
 @login_required
@@ -680,9 +605,9 @@ def page(page_id):
     )
 
 
-# ============================================================
+# =========================
 # NEW PAGE
-# ============================================================
+# =========================
 
 @app.route("/new", methods=["POST"])
 @login_required
@@ -734,9 +659,9 @@ def new_page():
     return redirect(f"/page/{page_id}")
 
 
-# ============================================================
+# =========================
 # SAVE PAGE
-# ============================================================
+# =========================
 
 @app.route("/save/<int:page_id>", methods=["POST"])
 @login_required
@@ -814,9 +739,9 @@ def save(page_id):
     return "OK"
 
 
-# ============================================================
+# =========================
 # DELETE
-# ============================================================
+# =========================
 
 @app.route("/delete/<int:page_id>", methods=["POST"])
 @login_required
@@ -859,9 +784,9 @@ def delete(page_id):
     return "OK"
 
 
-# ============================================================
+# =========================
 # FAVORITE
-# ============================================================
+# =========================
 
 @app.route("/favorite/<int:page_id>", methods=["POST"])
 @login_required
@@ -944,9 +869,9 @@ def favorite(page_id):
     return "OK"
 
 
-# ============================================================
+# =========================
 # CREATE FOLDER
-# ============================================================
+# =========================
 
 @app.route("/folder/new", methods=["POST"])
 @login_required
@@ -996,9 +921,9 @@ def create_folder():
     return redirect("/workspace")
 
 
-# ============================================================
+# =========================
 # MOVE PAGE
-# ============================================================
+# =========================
 
 @app.route("/move/<int:page_id>", methods=["POST"])
 @login_required
@@ -1088,314 +1013,23 @@ def move_page(page_id):
     return "OK"
 
 
-# ============================================================
-# MYAI PAGE
-# ============================================================
+from myai import myai
+app.register_blueprint(myai)
 
-@app.route("/ai")
-@login_required
-def ai_page():
-
-    return render_template(
-        "ai.html",
-        username=session.get("username", "User")
-    )
-
-
-# ============================================================
-# MYAI WEB SEARCH
-# ============================================================
-
-def ai_web_search(query):
-
-    try:
-
-        response = requests.get(
-            f"{SEARXNG_URL}/search",
-            params={
-                "q": query,
-                "format": "json",
-                "categories": "general"
-            },
-            timeout=10
-        )
-
-        response.raise_for_status()
-
-        data = response.json()
-
-        results = []
-
-        for result in data.get("results", [])[:8]:
-
-            title = result.get("title", "")
-            content = result.get("content", "")
-            url = result.get("url", "")
-
-            if title and url:
-
-                results.append({
-                    "title": title,
-                    "content": content,
-                    "url": url
-                })
-
-        return results
-
-    except Exception as e:
-
-        print("MyAI search error:", e)
-
-        return []
-
-
-# ============================================================
-# MYAI CHAT API
-# ============================================================
-
-@app.route("/api/ai", methods=["POST"])
-@login_required
-def ai_chat():
-
-    if not gemini_client:
-
-        return jsonify({
-            "error": "Gemini API is not configured."
-        }), 500
-
-    data = request.get_json() or {}
-
-    message = data.get(
-        "message",
-        ""
-    ).strip()
-
-    history = data.get(
-        "history",
-        []
-    )
-
-    if not message:
-
-        return jsonify({
-            "error": "Please enter a message."
-        }), 400
-
-
-    # Safety filter
-    if not safety_check(message):
-
-        return jsonify({
-            "error": "I can't help with that request."
-        }), 400
-
-
-    # Internet search
-    results = ai_web_search(message)
-
-
-    search_context = ""
-
-    if results:
-
-        search_context = "INTERNET SEARCH RESULTS:\n\n"
-
-        for i, result in enumerate(results, 1):
-
-            search_context += (
-                f"[{i}] {result['title']}\n"
-                f"URL: {result['url']}\n"
-                f"{result['content']}\n\n"
-            )
-
-    else:
-
-        search_context = (
-            "No internet search results were available."
-        )
-
-
-    # Conversation history
-    conversation = ""
-
-    for item in history[-12:]:
-
-        role = item.get(
-            "role",
-            "user"
-        )
-
-        content = item.get(
-            "content",
-            ""
-        )
-
-        if role == "assistant":
-
-            conversation += (
-                f"MyAI: {content}\n"
-            )
-
-        else:
-
-            conversation += (
-                f"User: {content}\n"
-            )
-
-
-    # Prompt
-    prompt = f"""
-You are MyAI, the AI assistant built into MySpace.
-
-You are helpful, honest, and clear.
-
-SAFETY RULES:
-
-- Do not help steal passwords, accounts, money, or personal information.
-- Do not provide malware, ransomware, spyware, or credential-stealing code.
-- Do not help bypass security systems without authorization.
-- For cybersecurity questions, focus on defensive and authorized security.
-- Do not provide instructions for seriously harming someone.
-- If a request is unsafe, briefly explain that you cannot help with it.
-
-INTERNET SEARCH RESULTS:
-
-{search_context}
-
-CONVERSATION:
-
-{conversation}
-
-CURRENT USER MESSAGE:
-
-{message}
-
-Answer the user clearly.
-
-If you use information from the internet results,
-mention the relevant source when appropriate.
-"""
-
-
-    # Try models
-    last_error = None
-
-    for model in AI_MODELS:
-
-        print(
-            f"MyAI trying model: {model}"
-        )
-
-        for attempt in range(2):
-
-            try:
-
-                response = gemini_client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
-
-                answer = response.text
-
-                if not answer:
-
-                    answer = (
-                        "I couldn't generate a response."
-                    )
-
-                print(
-                    f"MyAI success: {model}"
-                )
-
-                return jsonify({
-                    "answer": answer,
-                    "sources": results,
-                    "model": model
-                })
-
-
-            except Exception as e:
-
-                last_error = str(e)
-
-                print(
-                    f"MyAI error ({model}):",
-                    last_error
-                )
-
-                traceback.print_exc()
-             
-                # Temporary overload
-                if (
-                    "503" in last_error
-                    or "UNAVAILABLE" in last_error
-                ):
-
-                    if attempt == 0:
-
-                        time.sleep(2)
-
-                    continue
-
-
-                # Model unavailable
-                if (
-                    "404" in last_error
-                    or "NOT_FOUND" in last_error
-                ):
-
-                    break
-
-
-                # Other error
-                return jsonify({
-                    "error": (
-                        f"Gemini error: {last_error}"
-                    )
-                }), 500
-
-
-    return jsonify({
-        "error": (
-            "MyAI is temporarily unavailable. "
-            "Please try again in a few seconds."
-        )
-    }), 503
-
-
-# ============================================================
+# =========================
 # START
-# ============================================================
+# =========================
 
 if __name__ == "__main__":
 
     if DATABASE_URL:
-
-        print(
-            "🌐 MySpace V7 using PostgreSQL"
-        )
-
+        print("🌐 MySpace V6 using PostgreSQL")
     else:
-
-        print(
-            "💻 MySpace V7 using local SQLite"
-        )
-
-    print(
-        "🤖 MyAI enabled:",
-        bool(GEMINI_API_KEY)
-    )
+        print("💻 MySpace V6 using local SQLite")
 
     print()
-
-    print(
-        "Open:"
-    )
-
-    print(
-        "http://127.0.0.1:5000"
-    )
-
+    print("Open:")
+    print("http://127.0.0.1:5000")
     print()
 
     app.run(

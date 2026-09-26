@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -6,7 +7,7 @@
 <meta charset="UTF-8">
 
 <meta name="viewport"
-      content="width=device-width, initial-scale=1.0">
+   content="width=device-width, initial-scale=1.0">
 
 <title>MyAI - MySpace</title>
 
@@ -81,17 +82,26 @@ body {
     padding: 14px 16px;
     border-radius: 12px;
     line-height: 1.5;
-    white-space: pre-wrap;
 }
 
 .user {
     background: #e8f0fe;
     margin-left: 15%;
+    white-space: pre-wrap;
 }
 
 .ai {
     background: #f0f0f0;
     margin-right: 15%;
+}
+
+.ai a {
+    color: #1769aa;
+    text-decoration: underline;
+}
+
+.ai a:hover {
+    color: #0b4f7c;
 }
 
 .input-area {
@@ -148,81 +158,83 @@ button:disabled {
 
 <div class="header">
 
-    <div class="logo">
-        MySpace
-    </div>
-
-    <div class="links">
-
-        <a href="/workspace">
-            Workspace
-        </a>
-
-        <a href="/ai">
-            🤖 MyAI
-        </a>
-
-        <a href="/logout">
-            Logout
-        </a>
-
-    </div>
-
+```
+<div class="logo">
+    MySpace
 </div>
 
+<div class="links">
+
+    <a href="/workspace">
+        Workspace
+    </a>
+
+    <a href="/ai">
+        🤖 MyAI
+    </a>
+
+    <a href="/logout">
+        Logout
+    </a>
+
+</div>
+```
+
+</div>
 
 <div class="chat">
 
-    <div class="title">
+```
+<div class="title">
 
-        <h1>🤖 MyAI</h1>
+    <h1>🤖 MyAI</h1>
 
-        <p>
-            Your AI assistant inside MySpace
-        </p>
+    <p>
+        Your AI assistant inside MySpace
+    </p>
 
-    </div>
-
-
-    <div
-        id="messages"
-        class="messages"
-    >
-
-        <div class="message ai">
-
-            Hi {{ username }}! 👋
-
-            I'm MyAI, your AI assistant inside MySpace.
-
-            I can answer questions, help with coding,
-            search the internet, explain schoolwork,
-            and much more.
-
-        </div>
-
-    </div>
+</div>
 
 
-    <div class="input-area">
+<div
+    id="messages"
+    class="messages"
+>
 
-        <textarea
-            id="message"
-            placeholder="Ask MyAI something..."
-            onkeydown="handleKey(event)"
-        ></textarea>
+    <div class="message ai">
 
-        <button
-            id="sendButton"
-            onclick="sendMessage()"
-        >
-            Send
-        </button>
+        Hi {{ username }}! 👋
+
+        I'm MyAI, your AI assistant inside MySpace.
+
+        I can answer questions, help with coding,
+        search the internet, explain schoolwork,
+        and much more.
 
     </div>
 
 </div>
 
+
+<div class="input-area">
+
+    <textarea
+        id="message"
+        placeholder="Ask MyAI something..."
+        onkeydown="handleKey(event)"
+    ></textarea>
+
+    <button
+        id="sendButton"
+        onclick="sendMessage()"
+    >
+        Send
+    </button>
+
+</div>
+```
+
+</div>
 
 <script>
 
@@ -239,6 +251,83 @@ const sendButton =
 let history = [];
 
 
+/*
+=================================
+SAFE MARKDOWN RENDERING
+=================================
+*/
+
+function escapeHtml(text) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+}
+
+
+function renderMarkdown(text) {
+
+    let html =
+        escapeHtml(text);
+
+
+    /*
+    Markdown links:
+
+    [Google](https://google.com)
+    */
+
+    html = html.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+
+    /*
+    Bold:
+
+    **hello**
+    */
+
+    html = html.replace(
+        /\*\*([^*]+)\*\*/g,
+        "<strong>$1</strong>"
+    );
+
+
+    /*
+    Italic:
+
+    *hello*
+    */
+
+    html = html.replace(
+        /(?<!\*)\*([^*]+)\*(?!\*)/g,
+        "<em>$1</em>"
+    );
+
+
+    /*
+    Line breaks
+    */
+
+    html =
+        html.replace(/\n/g, "<br>");
+
+
+    return html;
+}
+
+
+/*
+=================================
+ADD MESSAGE
+=================================
+*/
+
 function addMessage(
     text,
     type
@@ -250,7 +339,18 @@ function addMessage(
     div.className =
         "message " + type;
 
-    div.textContent = text;
+
+    if (type === "ai") {
+
+        div.innerHTML =
+            renderMarkdown(text);
+
+    } else {
+
+        div.textContent =
+            text;
+    }
+
 
     messages.appendChild(div);
 
@@ -258,6 +358,12 @@ function addMessage(
         messages.scrollHeight;
 }
 
+
+/*
+=================================
+KEYBOARD
+=================================
+*/
 
 function handleKey(event) {
 
@@ -273,6 +379,12 @@ function handleKey(event) {
     }
 }
 
+
+/*
+=================================
+SEND MESSAGE
+=================================
+*/
 
 async function sendMessage() {
 
@@ -345,6 +457,12 @@ async function sendMessage() {
         }
 
 
+        /*
+        =========================
+        AI ANSWER
+        =========================
+        */
+
         addMessage(
             data.answer,
             "ai"
@@ -356,6 +474,12 @@ async function sendMessage() {
             content: data.answer
         });
 
+
+        /*
+        =========================
+        SOURCES
+        =========================
+        */
 
         if (
             data.sources
@@ -371,6 +495,7 @@ async function sendMessage() {
 
             sourceBox.innerHTML =
                 "<strong>Sources:</strong>";
+
 
             data.sources.forEach(
                 source => {
@@ -395,6 +520,7 @@ async function sendMessage() {
                     );
                 }
             );
+
 
             messages.appendChild(
                 sourceBox
