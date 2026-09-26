@@ -1,24 +1,23 @@
 from flask import Blueprint, render_template, request, jsonify, session
 import os
-import sqlite3
 import requests
+import sqlite3
+
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 
 load_dotenv()
 
 myai = Blueprint("myai", __name__)
 
+# =========================================================
+# GEMINI
+# =========================================================
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 print("MyAI API key loaded:", bool(GEMINI_API_KEY))
-
-SEARXNG_URL = os.environ.get(
-    "SEARXNG_URL",
-    "http://localhost:8080"
-)
-
-DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if GEMINI_API_KEY:
     gemini_client = genai.Client(
@@ -29,225 +28,221 @@ else:
 
 
 AI_MODELS = [
-    "gemini-3.6-flash",
+    "gemini-3.8-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.7-flash",
     "gemini-3.8-flash"
 ]
 
+SEARXNG_URL = os.environ.get(
+    "SEARXNG_URL",
+    "https://virtue-ind-moscow-javascript.trycloudflare.com"
+)
 
-# =========================
+# =========================================================
 # DATABASE
-# =========================
+# =========================================================
 
-def is_postgres():
-    return bool(DATABASE_URL)
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def get_db():
-
     if DATABASE_URL:
         import psycopg2
 
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn
+        return psycopg2.connect(DATABASE_URL)
 
     conn = sqlite3.connect("myspace.db")
     conn.row_factory = sqlite3.Row
-
     return conn
 
 
 def setup_chat_database():
 
     conn = get_db()
-    cursor = conn.cursor()
 
-    if is_postgres():
+    try:
+        cur = conn.cursor()
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversations (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                title TEXT NOT NULL DEFAULT 'New Chat',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        if DATABASE_URL:
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id SERIAL PRIMARY KEY,
-                conversation_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    title TEXT NOT NULL DEFAULT 'New Chat',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
-    else:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id SERIAL PRIMARY KEY,
+                    conversation_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                title TEXT NOT NULL DEFAULT 'New Chat',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        else:
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                conversation_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    title TEXT NOT NULL DEFAULT 'New Chat',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
-    conn.commit()
-    conn.close()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+        conn.commit()
+
+    finally:
+        conn.close()
 
 
 setup_chat_database()
 
 
-# =========================
-# LOGIN CHECK
-# =========================
+# =========================================================
+# USER
+# =========================================================
 
-def logged_in():
+def get_current_user_id():
 
-    return "user_id" in session
+    user_id = session.get("user_id")
 
-
-# =========================
-# INTERNET SEARCH
-# =========================
-
-def ai_web_search(query):
+    if not user_id:
+        return None
 
     try:
-
-        response = requests.get(
-            f"{SEARXNG_URL}/search",
-            params={
-                "q": query,
-                "format": "json",
-                "categories": "general"
-            },
-            timeout=10
-        )
-
-        response.raise_for_status()
-
-        data = response.json()
-
-        results = []
-
-        for result in data.get("results", [])[:8]:
-
-            title = result.get("title", "")
-            content = result.get("content", "")
-            url = result.get("url", "")
-
-            if title and url:
-
-                results.append({
-                    "title": title,
-                    "content": content,
-                    "url": url
-                })
-
-        return results
-
-    except Exception as e:
-
-        print("MyAI search error:", e)
-
-        return []
+        return int(user_id)
+    except (ValueError, TypeError):
+        return None
 
 
-# =========================
+# =========================================================
 # AI PAGE
-# =========================
+# =========================================================
 
 @myai.route("/ai")
 def ai_page():
 
-    if not logged_in():
-        return jsonify({
-            "error": "Please log in first."
-        }), 401
+    user_id = get_current_user_id()
+
+    if not user_id:
+        return "Please log in to use MyAI.", 401
 
     return render_template(
         "ai.html",
-        username=session.get("username", "")
+        username=session.get("username", "User")
     )
 
 
-# =========================
-# GET CONVERSATIONS
-# =========================
+# =========================================================
+# LIST CHATS
+# =========================================================
 
 @myai.route("/api/conversations", methods=["GET"])
 def get_conversations():
 
-    if not logged_in():
+    user_id = get_current_user_id()
+
+    if not user_id:
         return jsonify({
-            "error": "Please log in first."
+            "error": "You must be logged in."
         }), 401
 
-    user_id = session["user_id"]
-
     conn = get_db()
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id, title, created_at, updated_at
-        FROM conversations
-        WHERE user_id = %s
-        ORDER BY updated_at DESC
-    """ if is_postgres() else """
-        SELECT id, title, created_at, updated_at
-        FROM conversations
-        WHERE user_id = ?
-        ORDER BY updated_at DESC
-    """, (user_id,))
+    try:
+        cur = conn.cursor()
 
-    rows = cursor.fetchall()
+        if DATABASE_URL:
 
-    conn.close()
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    created_at,
+                    updated_at
+                FROM conversations
+                WHERE user_id = %s
+                ORDER BY updated_at DESC
+            """, (user_id,))
 
-    conversations = []
+            rows = cur.fetchall()
 
-    for row in rows:
+            conversations = []
 
-        conversations.append({
-            "id": row[0],
-            "title": row[1],
-            "created_at": str(row[2]),
-            "updated_at": str(row[3])
+            for row in rows:
+
+                conversations.append({
+                    "id": row[0],
+                    "title": row[1],
+                    "created_at": str(row[2]),
+                    "updated_at": str(row[3])
+                })
+
+        else:
+
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    created_at,
+                    updated_at
+                FROM conversations
+                WHERE user_id = ?
+                ORDER BY updated_at DESC
+            """, (user_id,))
+
+            rows = cur.fetchall()
+
+            conversations = [
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"]
+                }
+                for row in rows
+            ]
+
+        return jsonify({
+            "conversations": conversations
         })
 
-    return jsonify(conversations)
+    finally:
+        conn.close()
 
 
-# =========================
-# CREATE CONVERSATION
-# =========================
+# =========================================================
+# CREATE CHAT
+# =========================================================
 
 @myai.route("/api/conversations", methods=["POST"])
 def create_conversation():
 
-    if not logged_in():
-        return jsonify({
-            "error": "Please log in first."
-        }), 401
+    user_id = get_current_user_id()
 
-    user_id = session["user_id"]
+    if not user_id:
+        return jsonify({
+            "error": "You must be logged in."
+        }), 401
 
     data = request.get_json(silent=True) or {}
 
@@ -259,114 +254,186 @@ def create_conversation():
     if not title:
         title = "New Chat"
 
-    title = title[:100]
-
     conn = get_db()
-    cursor = conn.cursor()
 
-    if is_postgres():
+    try:
+        cur = conn.cursor()
 
-        cursor.execute("""
-            INSERT INTO conversations
-            (user_id, title)
-            VALUES (%s, %s)
-            RETURNING id
-        """, (user_id, title))
+        if DATABASE_URL:
 
-        conversation_id = cursor.fetchone()[0]
+            cur.execute("""
+                INSERT INTO conversations
+                    (user_id, title)
+                VALUES
+                    (%s, %s)
+                RETURNING id
+            """, (
+                user_id,
+                title
+            ))
 
-    else:
+            conversation_id = cur.fetchone()[0]
 
-        cursor.execute("""
-            INSERT INTO conversations
-            (user_id, title)
-            VALUES (?, ?)
-        """, (user_id, title))
+        else:
 
-        conversation_id = cursor.lastrowid
+            cur.execute("""
+                INSERT INTO conversations
+                    (user_id, title)
+                VALUES
+                    (?, ?)
+            """, (
+                user_id,
+                title
+            ))
 
-    conn.commit()
-    conn.close()
+            conversation_id = cur.lastrowid
 
-    return jsonify({
-        "id": conversation_id,
-        "title": title
-    })
-
-
-# =========================
-# LOAD ONE CONVERSATION
-# =========================
-
-@myai.route("/api/conversations/<int:conversation_id>", methods=["GET"])
-def load_conversation(conversation_id):
-
-    if not logged_in():
-        return jsonify({
-            "error": "Please log in first."
-        }), 401
-
-    user_id = session["user_id"]
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, title
-        FROM conversations
-        WHERE id = %s AND user_id = %s
-    """ if is_postgres() else """
-        SELECT id, title
-        FROM conversations
-        WHERE id = ? AND user_id = ?
-    """, (conversation_id, user_id))
-
-    conversation = cursor.fetchone()
-
-    if not conversation:
-
-        conn.close()
+        conn.commit()
 
         return jsonify({
-            "error": "Chat not found."
-        }), 404
-
-    cursor.execute("""
-        SELECT role, content, created_at
-        FROM messages
-        WHERE conversation_id = %s
-        ORDER BY id ASC
-    """ if is_postgres() else """
-        SELECT role, content, created_at
-        FROM messages
-        WHERE conversation_id = ?
-        ORDER BY id ASC
-    """, (conversation_id,))
-
-    rows = cursor.fetchall()
-
-    conn.close()
-
-    messages = []
-
-    for row in rows:
-
-        messages.append({
-            "role": row[0],
-            "content": row[1],
-            "created_at": str(row[2])
+            "id": conversation_id,
+            "title": title
         })
 
-    return jsonify({
-        "id": conversation[0],
-        "title": conversation[1],
-        "messages": messages
-    })
+    finally:
+        conn.close()
 
 
-# =========================
-# DELETE CONVERSATION
-# =========================
+# =========================================================
+# GET CHAT
+# =========================================================
+
+@myai.route(
+    "/api/conversations/<int:conversation_id>",
+    methods=["GET"]
+)
+def get_conversation(conversation_id):
+
+    user_id = get_current_user_id()
+
+    if not user_id:
+        return jsonify({
+            "error": "You must be logged in."
+        }), 401
+
+    conn = get_db()
+
+    try:
+        cur = conn.cursor()
+
+        if DATABASE_URL:
+
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    created_at,
+                    updated_at
+                FROM conversations
+                WHERE id = %s
+                AND user_id = %s
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+            conversation = cur.fetchone()
+
+            if not conversation:
+
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
+
+            cur.execute("""
+                SELECT
+                    role,
+                    content,
+                    created_at
+                FROM messages
+                WHERE conversation_id = %s
+                ORDER BY id ASC
+            """, (conversation_id,))
+
+            messages = [
+                {
+                    "role": row[0],
+                    "content": row[1],
+                    "created_at": str(row[2])
+                }
+                for row in cur.fetchall()
+            ]
+
+            return jsonify({
+                "conversation": {
+                    "id": conversation[0],
+                    "title": conversation[1],
+                    "created_at": str(conversation[2]),
+                    "updated_at": str(conversation[3])
+                },
+                "messages": messages
+            })
+
+        else:
+
+            cur.execute("""
+                SELECT
+                    id,
+                    title,
+                    created_at,
+                    updated_at
+                FROM conversations
+                WHERE id = ?
+                AND user_id = ?
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+            conversation = cur.fetchone()
+
+            if not conversation:
+
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
+
+            cur.execute("""
+                SELECT
+                    role,
+                    content,
+                    created_at
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY id ASC
+            """, (conversation_id,))
+
+            messages = [
+                {
+                    "role": row["role"],
+                    "content": row["content"],
+                    "created_at": row["created_at"]
+                }
+                for row in cur.fetchall()
+            ]
+
+            return jsonify({
+                "conversation": {
+                    "id": conversation["id"],
+                    "title": conversation["title"],
+                    "created_at": conversation["created_at"],
+                    "updated_at": conversation["updated_at"]
+                },
+                "messages": messages
+            })
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# DELETE CHAT
+# =========================================================
 
 @myai.route(
     "/api/conversations/<int:conversation_id>",
@@ -374,79 +441,464 @@ def load_conversation(conversation_id):
 )
 def delete_conversation(conversation_id):
 
-    if not logged_in():
+    user_id = get_current_user_id()
+
+    if not user_id:
         return jsonify({
-            "error": "Please log in first."
+            "error": "You must be logged in."
         }), 401
 
-    user_id = session["user_id"]
-
     conn = get_db()
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT id
-        FROM conversations
-        WHERE id = %s AND user_id = %s
-    """ if is_postgres() else """
-        SELECT id
-        FROM conversations
-        WHERE id = ? AND user_id = ?
-    """, (conversation_id, user_id))
+    try:
+        cur = conn.cursor()
 
-    conversation = cursor.fetchone()
+        if DATABASE_URL:
 
-    if not conversation:
+            cur.execute("""
+                SELECT id
+                FROM conversations
+                WHERE id = %s
+                AND user_id = %s
+            """, (
+                conversation_id,
+                user_id
+            ))
 
-        conn.close()
+            if not cur.fetchone():
+
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
+
+            cur.execute("""
+                DELETE FROM messages
+                WHERE conversation_id = %s
+            """, (conversation_id,))
+
+            cur.execute("""
+                DELETE FROM conversations
+                WHERE id = %s
+                AND user_id = %s
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+        else:
+
+            cur.execute("""
+                SELECT id
+                FROM conversations
+                WHERE id = ?
+                AND user_id = ?
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+            if not cur.fetchone():
+
+                return jsonify({
+                    "error": "Chat not found."
+                }), 404
+
+            cur.execute("""
+                DELETE FROM messages
+                WHERE conversation_id = ?
+            """, (conversation_id,))
+
+            cur.execute("""
+                DELETE FROM conversations
+                WHERE id = ?
+                AND user_id = ?
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+        conn.commit()
 
         return jsonify({
-            "error": "Chat not found."
-        }), 404
+            "success": True
+        })
 
-    cursor.execute("""
-        DELETE FROM messages
-        WHERE conversation_id = %s
-    """ if is_postgres() else """
-        DELETE FROM messages
-        WHERE conversation_id = ?
-    """, (conversation_id,))
-
-    cursor.execute("""
-        DELETE FROM conversations
-        WHERE id = %s AND user_id = %s
-    """ if is_postgres() else """
-        DELETE FROM conversations
-        WHERE id = ? AND user_id = ?
-    """, (conversation_id, user_id))
-
-    conn.commit()
-    conn.close()
-
-    return jsonify({
-        "success": True
-    })
+    finally:
+        conn.close()
 
 
-# =========================
-# AI CHAT
-# =========================
+# =========================================================
+# SAVE MESSAGE
+# =========================================================
+
+def save_message(
+    conversation_id,
+    role,
+    content
+):
+
+    conn = get_db()
+
+    try:
+        cur = conn.cursor()
+
+        if DATABASE_URL:
+
+            cur.execute("""
+                INSERT INTO messages
+                    (conversation_id, role, content)
+                VALUES
+                    (%s, %s, %s)
+            """, (
+                conversation_id,
+                role,
+                content
+            ))
+
+            cur.execute("""
+                UPDATE conversations
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (conversation_id,))
+
+        else:
+
+            cur.execute("""
+                INSERT INTO messages
+                    (conversation_id, role, content)
+                VALUES
+                    (?, ?, ?)
+            """, (
+                conversation_id,
+                role,
+                content
+            ))
+
+            cur.execute("""
+                UPDATE conversations
+                SET updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (conversation_id,))
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# CHAT HISTORY
+# =========================================================
+
+def get_chat_history(conversation_id):
+
+    conn = get_db()
+
+    try:
+        cur = conn.cursor()
+
+        if DATABASE_URL:
+
+            cur.execute("""
+                SELECT role, content
+                FROM messages
+                WHERE conversation_id = %s
+                ORDER BY id ASC
+            """, (conversation_id,))
+
+            rows = cur.fetchall()
+
+            history = []
+
+            for row in rows:
+
+                history.append(
+                    f"{row[0].upper()}: {row[1]}"
+                )
+
+        else:
+
+            cur.execute("""
+                SELECT role, content
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY id ASC
+            """, (conversation_id,))
+
+            rows = cur.fetchall()
+
+            history = []
+
+            for row in rows:
+
+                history.append(
+                    f"{row['role'].upper()}: {row['content']}"
+                )
+
+        return "\n\n".join(history)
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# UPDATE TITLE
+# =========================================================
+
+def update_chat_title(
+    conversation_id,
+    title
+):
+
+    conn = get_db()
+
+    try:
+        cur = conn.cursor()
+
+        if DATABASE_URL:
+
+            cur.execute("""
+                UPDATE conversations
+                SET title = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (
+                title,
+                conversation_id
+            ))
+
+        else:
+
+            cur.execute("""
+                UPDATE conversations
+                SET title = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (
+                title,
+                conversation_id
+            ))
+
+        conn.commit()
+
+    finally:
+        conn.close()
+
+
+# =========================================================
+# GEMINI REQUEST
+# =========================================================
+def ask_gemini(prompt, use_search=True):
+    if not gemini_client:
+        raise RuntimeError("GEMINI_API_KEY is not configured.")
+
+    last_error = None
+
+    # =========================
+    # LIVE INTERNET SEARCH
+    # =========================
+    if use_search:
+        try:
+            print("MyAI searching the internet with SearXNG...")
+
+            # Search only the user's actual question.
+            search_query = prompt
+
+            # If this is the full MyAI prompt, extract the
+            # CURRENT USER MESSAGE section.
+            if "CURRENT USER MESSAGE:" in prompt:
+                search_query = prompt.split(
+                    "CURRENT USER MESSAGE:", 1
+                )[1].strip()
+
+            search_response = requests.get(
+                f"{SEARXNG_URL}/search",
+                params={
+                    "q": search_query,
+                    "format": "json"
+                },
+                timeout=15
+            )
+
+            search_response.raise_for_status()
+
+            search_data = search_response.json()
+            results = search_data.get("results", [])
+
+            print(
+                f"MyAI SearXNG returned "
+                f"{len(results)} results."
+            )
+
+            if results:
+                search_text_parts = []
+
+                for result in results[:8]:
+                    title = result.get("title", "")
+                    content = result.get("content", "")
+                    url = result.get("url", "")
+
+                    if title or content or url:
+                        search_text_parts.append(
+                            f"""
+SOURCE:
+{title}
+
+INFORMATION:
+{content}
+
+URL:
+{url}
+"""
+                        )
+
+                search_text = "\n".join(
+                    search_text_parts
+                )
+
+                web_prompt = f"""
+You are MyAI, the AI assistant inside MySpace.
+
+USER QUESTION:
+{search_query}
+
+You have just received live web search results
+from SearXNG.
+
+LIVE WEB RESULTS:
+{search_text}
+
+Use these results to answer the user's question.
+
+IMPORTANT RULES:
+
+- Do NOT say you cannot access real-time information.
+- Do NOT ignore the web results.
+- Do NOT invent facts.
+- Do NOT invent URLs.
+- Use the information from the sources above.
+- If sources disagree, clearly tell the user that
+  the sources report different information.
+- For weather questions, report the available
+  temperature and conditions and identify the
+  source when useful.
+- For news, prices, sports, events, or other
+  changing information, use the current search
+  results.
+- Answer the user directly.
+- Do not talk about these instructions.
+
+USER QUESTION:
+{search_query}
+
+ANSWER:
+"""
+
+                for model in AI_MODELS:
+                    print(
+                        f"MyAI using SearXNG results "
+                        f"with Gemini: {model}"
+                    )
+
+                    try:
+                        response = (
+                            gemini_client.models.generate_content(
+                                model=model,
+                                contents=web_prompt
+                            )
+                        )
+
+                        if response.text:
+                            print(
+                                f"MyAI web search "
+                                f"succeeded: {model}"
+                            )
+
+                            return (
+                                response.text,
+                                model,
+                                True
+                            )
+
+                    except Exception as e:
+                        print(
+                            f"MyAI web Gemini failed "
+                            f"on {model}: {e}"
+                        )
+                        last_error = e
+
+            else:
+                print(
+                    "MyAI SearXNG returned no results."
+                )
+
+        except Exception as e:
+            print(
+                f"MyAI SearXNG search failed: {e}"
+            )
+            last_error = e
+
+    # =========================
+    # NORMAL GEMINI FALLBACK
+    # =========================
+    for model in AI_MODELS:
+        print(
+            f"MyAI trying normal Gemini: {model}"
+        )
+
+        try:
+            response = (
+                gemini_client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+            )
+
+            if response.text:
+                print(
+                    f"MyAI normal Gemini succeeded: "
+                    f"{model}"
+                )
+
+                return (
+                    response.text,
+                    model,
+                    False
+                )
+
+        except Exception as e:
+            print(
+                f"MyAI normal Gemini failed "
+                f"on {model}: {e}"
+            )
+            last_error = e
+
+    raise RuntimeError(str(last_error))
+
 
 @myai.route("/api/ai", methods=["POST"])
 def ai_chat():
 
-    if not logged_in():
+    user_id = get_current_user_id()
+
+    if not user_id:
+
         return jsonify({
-            "error": "Please log in first."
+            "error": "You must be logged in."
         }), 401
 
     if not gemini_client:
 
         return jsonify({
-            "error": "MyAI is not configured. Add GEMINI_API_KEY."
+            "error": (
+                "MyAI is not configured. "
+                "Add GEMINI_API_KEY."
+            )
         }), 500
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     message = data.get(
         "message",
@@ -463,259 +915,216 @@ def ai_chat():
             "error": "Please enter a message."
         }), 400
 
-    user_id = session["user_id"]
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    # Create a conversation automatically if needed
-
     if not conversation_id:
 
-        title = message[:50]
+        return jsonify({
+            "error": "Please select or create a chat."
+        }), 400
 
-        if is_postgres():
+    try:
 
-            cursor.execute("""
-                INSERT INTO conversations
-                (user_id, title)
-                VALUES (%s, %s)
-                RETURNING id
-            """, (user_id, title))
+        conversation_id = int(
+            conversation_id
+        )
 
-            conversation_id = cursor.fetchone()[0]
+    except (ValueError, TypeError):
+
+        return jsonify({
+            "error": "Invalid conversation ID."
+        }), 400
+
+
+    # =====================================================
+    # CHECK CHAT OWNERSHIP
+    # =====================================================
+
+    conn = get_db()
+
+    try:
+
+        cur = conn.cursor()
+
+        if DATABASE_URL:
+
+            cur.execute("""
+                SELECT id, title
+                FROM conversations
+                WHERE id = %s
+                AND user_id = %s
+            """, (
+                conversation_id,
+                user_id
+            ))
+
+            conversation = cur.fetchone()
 
         else:
 
-            cursor.execute("""
-                INSERT INTO conversations
-                (user_id, title)
-                VALUES (?, ?)
-            """, (user_id, title))
+            cur.execute("""
+                SELECT id, title
+                FROM conversations
+                WHERE id = ?
+                AND user_id = ?
+            """, (
+                conversation_id,
+                user_id
+            ))
 
-            conversation_id = cursor.lastrowid
+            conversation = cur.fetchone()
 
-    # Make sure this chat belongs to this user
-
-    cursor.execute("""
-        SELECT id, title
-        FROM conversations
-        WHERE id = %s AND user_id = %s
-    """ if is_postgres() else """
-        SELECT id, title
-        FROM conversations
-        WHERE id = ? AND user_id = ?
-    """, (conversation_id, user_id))
-
-    conversation_row = cursor.fetchone()
-
-    if not conversation_row:
+    finally:
 
         conn.close()
+
+
+    if not conversation:
 
         return jsonify({
             "error": "Chat not found."
         }), 404
 
-    # Save user message
 
-    cursor.execute("""
-        INSERT INTO messages
-        (conversation_id, role, content)
-        VALUES (%s, %s, %s)
-    """ if is_postgres() else """
-        INSERT INTO messages
-        (conversation_id, role, content)
-        VALUES (?, ?, ?)
-    """, (
+    # =====================================================
+    # SAVE USER MESSAGE
+    # =====================================================
+
+    save_message(
         conversation_id,
         "user",
         message
-    ))
-
-    # Load previous messages
-
-    cursor.execute("""
-        SELECT role, content
-        FROM messages
-        WHERE conversation_id = %s
-        ORDER BY id ASC
-    """ if is_postgres() else """
-        SELECT role, content
-        FROM messages
-        WHERE conversation_id = ?
-        ORDER BY id ASC
-    """, (conversation_id,))
-
-    history_rows = cursor.fetchall()
-
-    conversation_parts = []
-
-    for row in history_rows:
-
-        conversation_parts.append(
-            f"{row[0].upper()}: {row[1]}"
-        )
-
-    conversation = "\n\n".join(
-        conversation_parts
     )
 
-    # Update chat timestamp
 
-    cursor.execute("""
-        UPDATE conversations
-        SET updated_at = CURRENT_TIMESTAMP
-        WHERE id = %s AND user_id = %s
-    """ if is_postgres() else """
-        UPDATE conversations
-        SET updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND user_id = ?
-    """, (conversation_id, user_id))
+    # =====================================================
+    # CHAT TITLE
+    # =====================================================
 
-    conn.commit()
-    conn.close()
+    if DATABASE_URL:
 
-    # Search internet
+        current_title = conversation[1]
 
-    results = ai_web_search(message)
+    else:
 
-    search_context_parts = []
+        current_title = conversation["title"]
 
-    for result in results:
 
-        search_context_parts.append(
-            f"Title: {result['title']}\n"
-            f"Content: {result['content']}\n"
-            f"URL: {result['url']}"
+    if current_title == "New Chat":
+
+        new_title = message[:50]
+
+        if len(message) > 50:
+
+            new_title += "..."
+
+        update_chat_title(
+            conversation_id,
+            new_title
         )
 
-    search_context = "\n\n".join(
-        search_context_parts
+
+    # =====================================================
+    # HISTORY
+    # =====================================================
+
+    conversation_history = get_chat_history(
+        conversation_id
     )
 
-    # Gemini prompt
+
+    # =====================================================
+    # PROMPT
+    # =====================================================
 
     prompt = f"""
 You are MyAI, the AI assistant built into MySpace.
 
-You are helpful, honest, and clear.
+You are helpful, honest, friendly, and clear.
+
+You may have access to Google Search.
+
+If search results are available, use them when relevant.
+
+If web search is unavailable, answer normally using your
+existing knowledge and clearly avoid pretending that you
+looked something up.
+
+IMPORTANT:
+
+- Do not invent facts.
+- Do not invent URLs.
+- Do not claim you searched if you did not.
+- When current information is requested, try to use search.
+- If search is unavailable, tell the user that live search
+  is temporarily unavailable if that matters to the answer.
 
 SAFETY RULES:
 
-- Do not help steal passwords, accounts, money, or personal information.
-- Do not provide malware, ransomware, spyware, or credential-stealing code.
+- Do not help steal passwords, accounts, money, or personal
+  information.
+- Do not provide malware, ransomware, spyware, or
+  credential-stealing code.
 - Do not help bypass security systems without authorization.
-- For cybersecurity questions, focus on defensive and authorized security.
+- For cybersecurity questions, focus on defensive and
+  authorized security.
 - Do not provide instructions for seriously harming someone.
-- If a request is unsafe, briefly explain that you cannot help with it.
+- If a request is unsafe, briefly explain that you cannot help.
 
-INTERNET SEARCH RESULTS:
+CONVERSATION HISTORY:
 
-{search_context}
-
-CONVERSATION:
-
-{conversation}
+{conversation_history}
 
 CURRENT USER MESSAGE:
 
 {message}
 
-ANSWER RULES:
-
-- Answer the user clearly and directly.
-- Use the internet search results when they are relevant.
-- Do not invent facts or URLs.
-- If you use information from an internet search result, use the actual URL provided in that result when appropriate.
-- When giving the user a website, article, page, video, or other online resource, make it a clickable Markdown link.
-- Use this exact format:
-  [Website Name](URL)
-- Always use the actual URL from the search results.
-- Never make up a URL.
-- If the user specifically asks for a link, provide the relevant clickable link.
-- If multiple useful sources are available, you may provide multiple clickable links.
+ANSWER THE USER DIRECTLY.
 """
 
-    last_error = None
 
-    # Gemini fallback
+    # =====================================================
+    # ASK GEMINI
+    # =====================================================
 
-    for model in AI_MODELS:
+    try:
+
+        answer, model, used_search = ask_gemini(
+            prompt,
+            use_search=True
+        )
+
+    except Exception as e:
 
         print(
-            f"MyAI trying model: {model}"
+            "MyAI final error:",
+            str(e)
         )
 
-        try:
-
-            response = gemini_client.models.generate_content(
-                model=model,
-                contents=prompt
+        return jsonify({
+            "error": (
+                "MyAI could not get a response. "
+                f"{str(e)}"
             )
+        }), 503
 
-            answer = response.text
 
-            print(
-                f"MyAI succeeded with model: {model}"
-            )
+    # =====================================================
+    # SAVE AI RESPONSE
+    # =====================================================
 
-            # Save assistant response
+    save_message(
+        conversation_id,
+        "assistant",
+        answer
+    )
 
-            conn = get_db()
-            cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO messages
-                (conversation_id, role, content)
-                VALUES (%s, %s, %s)
-            """ if is_postgres() else """
-                INSERT INTO messages
-                (conversation_id, role, content)
-                VALUES (?, ?, ?)
-            """, (
-                conversation_id,
-                "assistant",
-                answer
-            ))
-
-            cursor.execute("""
-                UPDATE conversations
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s AND user_id = %s
-            """ if is_postgres() else """
-                UPDATE conversations
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND user_id = ?
-            """, (conversation_id, user_id))
-
-            conn.commit()
-            conn.close()
-
-            return jsonify({
-                "answer": answer,
-                "sources": results,
-                "model": model,
-                "conversation_id": conversation_id
-            })
-
-        except Exception as e:
-
-            error_text = str(e)
-
-            print(
-                f"MyAI model {model} failed: "
-                f"{error_text}"
-            )
-
-            last_error = e
-
-            continue
+    # =====================================================
+    # RETURN RESPONSE
+    # =====================================================
 
     return jsonify({
-        "error": (
-            "MyAI could not get a response from "
-            "any available Gemini model. "
-            f"Last error: {last_error}"
-        )
-    }), 503
+        "answer": answer,
+        "sources": [],
+        "model": model,
+        "web_search": used_search
+    })
