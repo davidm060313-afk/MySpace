@@ -13,9 +13,8 @@
         body {
             margin: 0;
             font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            height: 100vh;
-            overflow: hidden;
+            background: #f5f6fa;
+            color: #222;
         }
 
         .app {
@@ -23,103 +22,52 @@
             height: 100vh;
         }
 
-        /* SIDEBAR */
-
         .sidebar {
-            width: 270px;
+            width: 260px;
             background: #ffffff;
             border-right: 1px solid #ddd;
+            padding: 20px;
             display: flex;
             flex-direction: column;
         }
 
-        .sidebar-header {
-            padding: 18px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .brand {
-            font-size: 22px;
+        .logo {
+            font-size: 24px;
             font-weight: bold;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .new-chat {
             width: 100%;
             padding: 12px;
             border: none;
-            border-radius: 10px;
-            background: #111827;
+            border-radius: 8px;
+            background: #222;
             color: white;
             font-size: 15px;
             cursor: pointer;
+            margin-bottom: 20px;
         }
 
         .new-chat:hover {
-            background: #374151;
+            background: #444;
         }
 
         .chat-list {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
         }
 
         .chat-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 11px;
+            padding: 10px;
+            border-radius: 7px;
             margin-bottom: 5px;
-            border-radius: 9px;
             cursor: pointer;
         }
 
         .chat-item:hover {
             background: #f0f0f0;
         }
-
-        .chat-item.active {
-            background: #e5e7eb;
-        }
-
-        .chat-title {
-            flex: 1;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }
-
-        .delete-chat {
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 16px;
-            opacity: 0.6;
-        }
-
-        .delete-chat:hover {
-            opacity: 1;
-        }
-
-        .sidebar-footer {
-            padding: 12px;
-            border-top: 1px solid #ddd;
-        }
-
-        .back-link {
-            display: block;
-            text-decoration: none;
-            color: #333;
-            padding: 10px;
-            border-radius: 8px;
-        }
-
-        .back-link:hover {
-            background: #f0f0f0;
-        }
-
-        /* MAIN */
 
         .main {
             flex: 1;
@@ -128,13 +76,13 @@
             min-width: 0;
         }
 
-        .topbar {
+        .header {
             height: 65px;
             background: white;
             border-bottom: 1px solid #ddd;
             display: flex;
             align-items: center;
-            padding: 0 22px;
+            padding: 0 25px;
             font-size: 20px;
             font-weight: bold;
         }
@@ -145,52 +93,40 @@
             padding: 25px;
         }
 
-        .welcome {
-            max-width: 700px;
-            margin: 60px auto;
-            text-align: center;
-        }
-
-        .welcome h1 {
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-
-        .welcome p {
-            color: #666;
-            font-size: 17px;
-        }
-
         .message {
             max-width: 850px;
-            margin: 0 auto 18px auto;
-            display: flex;
-        }
-
-        .message.user {
-            justify-content: flex-end;
-        }
-
-        .bubble {
-            max-width: 75%;
-            padding: 13px 16px;
-            border-radius: 15px;
-            white-space: pre-wrap;
+            margin: 0 auto 20px auto;
+            padding: 15px 18px;
+            border-radius: 12px;
             line-height: 1.5;
+            white-space: pre-wrap;
         }
 
-        .user .bubble {
-            background: #111827;
+        .user {
+            background: #222;
             color: white;
         }
 
-        .assistant .bubble {
+        .ai {
             background: white;
             border: 1px solid #ddd;
-            color: #222;
         }
 
-        /* INPUT */
+        .sources {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 13px;
+        }
+
+        .sources a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        .sources a:hover {
+            text-decoration: underline;
+        }
 
         .input-area {
             background: white;
@@ -199,7 +135,7 @@
         }
 
         .input-box {
-            max-width: 900px;
+            max-width: 850px;
             margin: auto;
             display: flex;
             gap: 10px;
@@ -207,53 +143,45 @@
 
         #messageInput {
             flex: 1;
-            resize: none;
+            padding: 14px;
             border: 1px solid #ccc;
-            border-radius: 12px;
-            padding: 13px;
-            font-family: inherit;
-            font-size: 15px;
-            min-height: 48px;
-            max-height: 140px;
+            border-radius: 10px;
+            font-size: 16px;
             outline: none;
         }
 
-        #messageInput:focus {
-            border-color: #888;
-        }
-
         #sendButton {
+            padding: 14px 22px;
             border: none;
-            border-radius: 12px;
-            background: #111827;
+            border-radius: 10px;
+            background: #222;
             color: white;
-            padding: 0 20px;
             cursor: pointer;
             font-size: 15px;
         }
 
         #sendButton:hover {
-            background: #374151;
+            background: #444;
         }
 
         #sendButton:disabled {
-            opacity: 0.5;
+            background: #999;
             cursor: not-allowed;
         }
 
-        .typing {
+        .empty {
+            text-align: center;
             color: #777;
-            font-style: italic;
-            margin-bottom: 15px;
+            margin-top: 100px;
         }
 
         @media (max-width: 700px) {
             .sidebar {
-                width: 210px;
+                width: 190px;
             }
 
-            .bubble {
-                max-width: 90%;
+            .messages {
+                padding: 12px;
             }
         }
     </style>
@@ -263,82 +191,45 @@
 
 <div class="app">
 
-    <!-- SIDEBAR -->
-
     <aside class="sidebar">
+        <div class="logo">🤖 MyAI</div>
 
-        <div class="sidebar-header">
+        <button class="new-chat" onclick="newChat()">
+            + New Chat
+        </button>
 
-            <div class="brand">
-                🧠 MyAI
-            </div>
-
-            <button class="new-chat" onclick="newChat()">
-                ➕ New Chat
-            </button>
-
-        </div>
-
-        <div id="chatList" class="chat-list">
-            <div style="padding:15px;color:#777;">
-                Loading chats...
-            </div>
-        </div>
-
-        <div class="sidebar-footer">
-
-            <a href="/" class="back-link">
-                ← Back to MySpace
-            </a>
-
-        </div>
-
+        <div id="chatList" class="chat-list"></div>
     </aside>
-
-    <!-- MAIN -->
 
     <main class="main">
 
-        <div class="topbar">
-            🧠 MyAI
+        <div class="header">
+            MyAI
         </div>
 
         <div id="messages" class="messages">
-
-            <div class="welcome" id="welcome">
-
-                <h1>👋 Hi{{ " " + username if username else "" }}!</h1>
-
-                <p>
-                    I'm MyAI, your AI assistant inside MySpace.
-                </p>
-
-                <p>
-                    Ask me anything, get help with coding,
-                    schoolwork, or search the internet.
-                </p>
-
+            <div class="empty" id="emptyMessage">
+                <h2>👋 Hi!</h2>
+                <p>I'm MyAI, your assistant inside MySpace.</p>
+                <p>Ask me anything.</p>
             </div>
-
         </div>
 
         <div class="input-area">
-
             <div class="input-box">
 
-                <textarea
+                <input
                     id="messageInput"
-                    placeholder="Message MyAI..."
-                    rows="1"
-                    onkeydown="handleKey(event)"
-                ></textarea>
+                    type="text"
+                    placeholder="Ask MyAI anything..."
+                    autocomplete="off"
+                >
 
                 <button id="sendButton" onclick="sendMessage()">
                     Send
                 </button>
 
             </div>
-
         </div>
 
     </main>
@@ -347,242 +238,70 @@
 
 <script>
 
-let currentConversationId = null;
-let sending = false;
+let messages = [];
+
+const input = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
+const messagesDiv = document.getElementById("messages");
+const emptyMessage = document.getElementById("emptyMessage");
 
 
-/* =========================
-   LOAD CHAT LIST
-========================= */
+function addMessage(text, type, sources = []) {
 
-async function loadChats() {
+    if (emptyMessage) {
+        emptyMessage.remove();
+    }
 
-    try {
+    const div = document.createElement("div");
 
-        const response = await fetch("/api/conversations");
+    div.className = "message " + type;
 
-        if (!response.ok) {
-            throw new Error("Could not load chats");
-        }
+    div.textContent = text;
 
-        const chats = await response.json();
+    messagesDiv.appendChild(div);
 
-        const list = document.getElementById("chatList");
+    if (sources && sources.length > 0) {
 
-        list.innerHTML = "";
+        const sourceBox = document.createElement("div");
 
-        if (!chats.length) {
+        sourceBox.className = "sources";
 
-            list.innerHTML = `
-                <div style="padding:15px;color:#777;">
-                    No chats yet.
-                </div>
-            `;
+        const title = document.createElement("strong");
 
-            return;
-        }
+        title.textContent = "Sources:";
 
-        chats.forEach(chat => {
+        sourceBox.appendChild(title);
 
-            const item = document.createElement("div");
+        sources.forEach(source => {
 
-            item.className = "chat-item";
+            const row = document.createElement("div");
 
-            if (chat.id === currentConversationId) {
-                item.classList.add("active");
-            }
+            row.style.marginTop = "6px";
 
-            item.innerHTML = `
-                <span>💬</span>
-                <span class="chat-title">${escapeHtml(chat.title)}</span>
-                <button
-                    class="delete-chat"
-                    onclick="deleteChat(event, ${chat.id})"
-                    title="Delete chat"
-                >
-                    🗑️
-                </button>
-            `;
+            const link = document.createElement("a");
 
-            item.onclick = function() {
-                loadChat(chat.id);
-            };
+            link.href = source.url || "#";
 
-            list.appendChild(item);
+            link.target = "_blank";
+
+            link.rel = "noopener noreferrer";
+
+            link.textContent = source.title || source.url || "Source";
+
+            row.appendChild(link);
+
+            sourceBox.appendChild(row);
 
         });
 
-    } catch (error) {
-
-        console.error(error);
-
-        document.getElementById("chatList").innerHTML = `
-            <div style="padding:15px;color:#c00;">
-                Could not load chats.
-            </div>
-        `;
+        div.appendChild(sourceBox);
     }
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-
-/* =========================
-   NEW CHAT
-========================= */
-
-async function newChat() {
-
-    try {
-
-        const response = await fetch("/api/conversations", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                title: "New Chat"
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.error || "Could not create chat.");
-            return;
-        }
-
-        currentConversationId = data.id;
-
-        clearMessages();
-
-        await loadChats();
-
-        document.getElementById("messageInput").focus();
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert("Could not create a new chat.");
-
-    }
-}
-
-
-/* =========================
-   LOAD CHAT
-========================= */
-
-async function loadChat(id) {
-
-    try {
-
-        const response = await fetch(
-            `/api/conversations/${id}`
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.error || "Could not load chat.");
-            return;
-        }
-
-        currentConversationId = id;
-
-        const messages = document.getElementById("messages");
-
-        messages.innerHTML = "";
-
-        if (!data.messages.length) {
-
-            showWelcome();
-
-        } else {
-
-            data.messages.forEach(message => {
-
-                addMessage(
-                    message.role,
-                    message.content
-                );
-
-            });
-
-        }
-
-        await loadChats();
-
-        scrollToBottom();
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert("Could not load this chat.");
-
-    }
-}
-
-
-/* =========================
-   DELETE CHAT
-========================= */
-
-async function deleteChat(event, id) {
-
-    event.stopPropagation();
-
-    if (!confirm("Delete this chat?")) {
-        return;
-    }
-
-    try {
-
-        const response = await fetch(
-            `/api/conversations/${id}`,
-            {
-                method: "DELETE"
-            }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.error || "Could not delete chat.");
-            return;
-        }
-
-        if (currentConversationId === id) {
-
-            currentConversationId = null;
-
-            clearMessages();
-
-        }
-
-        await loadChats();
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert("Could not delete chat.");
-
-    }
-}
-
-
-/* =========================
-   SEND MESSAGE
-========================= */
 
 async function sendMessage() {
-
-    if (sending) {
-        return;
-    }
-
-    const input = document.getElementById("messageInput");
 
     const message = input.value.trim();
 
@@ -590,253 +309,118 @@ async function sendMessage() {
         return;
     }
 
-    sending = true;
-
-    document.getElementById("sendButton").disabled = true;
-
-    if (!currentConversationId) {
-
-        try {
-
-            const response = await fetch(
-                "/api/conversations",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        title: message.substring(0, 50)
-                    })
-                }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.error || "Could not create chat"
-                );
-            }
-
-            currentConversationId = data.id;
-
-            await loadChats();
-
-        } catch (error) {
-
-            alert(error.message);
-
-            sending = false;
-
-            document.getElementById("sendButton").disabled = false;
-
-            return;
-        }
-    }
-
-    hideWelcome();
-
-    addMessage("user", message);
+    addMessage(message, "user");
 
     input.value = "";
 
-    const typing = document.createElement("div");
+    sendButton.disabled = true;
 
-    typing.className = "typing";
-
-    typing.id = "typing";
-
-    typing.textContent = "MyAI is thinking...";
-
-    document.getElementById("messages").appendChild(typing);
-
-    scrollToBottom();
+    sendButton.textContent = "Thinking...";
 
     try {
 
-        const response = await fetch(
-            "/api/ai",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    message: message,
-                    conversation_id: currentConversationId
-                })
-            }
-        );
+        const response = await fetch("/api/ai", {
 
-        const data = await response.json();
+            method: "POST",
 
-        const oldTyping = document.getElementById("typing");
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
 
-        if (oldTyping) {
-            oldTyping.remove();
-        }
+            body: JSON.stringify({
+                message: message
+            })
 
-        if (!response.ok) {
+        });
+
+        const responseText = await response.text();
+
+        console.log("MyAI API status:", response.status);
+        console.log("MyAI API response:", responseText);
+
+        let data;
+
+        try {
+            data = JSON.parse(responseText);
+        } catch (jsonError) {
+
+            console.error("JSON parsing failed:", jsonError);
+            console.error("Server returned:", responseText);
+
             throw new Error(
-                data.error || "MyAI returned an error."
+                "The MyAI server did not return valid JSON."
             );
         }
 
-        addMessage(
-            "assistant",
-            data.answer || "I didn't get an answer."
-        );
+        if (!response.ok) {
 
-        await loadChats();
+            throw new Error(
+                data.error ||
+                data.message ||
+                "MyAI returned an error."
+            );
+        }
+
+        const answer =
+            data.answer ||
+            data.response ||
+            data.reply ||
+            "MyAI did not return an answer.";
+
+        addMessage(
+            answer,
+            "ai",
+            data.sources || []
+        );
 
     } catch (error) {
 
-        const oldTyping = document.getElementById("typing");
-
-        if (oldTyping) {
-            oldTyping.remove();
-        }
+        console.error("MyAI error:", error);
 
         addMessage(
-            "assistant",
-            "⚠️ " + error.message
+            "Sorry, MyAI had a problem: " + error.message,
+            "ai"
         );
 
+    } finally {
+
+        sendButton.disabled = false;
+
+        sendButton.textContent = "Send";
+
+        input.focus();
     }
-
-    sending = false;
-
-    document.getElementById("sendButton").disabled = false;
-
-    input.focus();
-
-    scrollToBottom();
 }
 
 
-/* =========================
-   ADD MESSAGE
-========================= */
+function newChat() {
 
-function addMessage(role, content) {
-
-    const messages = document.getElementById("messages");
-
-    const wrapper = document.createElement("div");
-
-    wrapper.className =
-        "message " +
-        (role === "user" ? "user" : "assistant");
-
-    const bubble = document.createElement("div");
-
-    bubble.className = "bubble";
-
-    bubble.textContent = content;
-
-    wrapper.appendChild(bubble);
-
-    messages.appendChild(wrapper);
-
-}
-
-
-/* =========================
-   CLEAR
-========================= */
-
-function clearMessages() {
-
-    document.getElementById("messages").innerHTML = "";
-
-    showWelcome();
-
-}
-
-
-function showWelcome() {
-
-    document.getElementById("messages").innerHTML = `
-        <div class="welcome" id="welcome">
-
-            <h1>👋 Hi{{ " " + username if username else "" }}!</h1>
-
-            <p>
-                I'm MyAI, your AI assistant inside MySpace.
-            </p>
-
-            <p>
-                Ask me anything, get help with coding,
-                schoolwork, or search the internet.
-            </p>
-
+    messagesDiv.innerHTML = `
+        <div class="empty" id="emptyMessage">
+            <h2>👋 Hi!</h2>
+            <p>I'm MyAI, your assistant inside MySpace.</p>
+            <p>Ask me anything.</p>
         </div>
     `;
+
+    input.value = "";
+
+    input.focus();
 }
 
 
-function hideWelcome() {
+input.addEventListener("keydown", function(event) {
 
-    const welcome = document.getElementById("welcome");
-
-    if (welcome) {
-        welcome.remove();
-    }
-
-}
-
-
-/* =========================
-   ENTER KEY
-========================= */
-
-function handleKey(event) {
-
-    if (event.key === "Enter" && !event.shiftKey) {
-
+    if (event.key === "Enter") {
         event.preventDefault();
-
         sendMessage();
-
     }
 
-}
+});
 
 
-/* =========================
-   SCROLL
-========================= */
-
-function scrollToBottom() {
-
-    const messages = document.getElementById("messages");
-
-    messages.scrollTop = messages.scrollHeight;
-
-}
-
-
-/* =========================
-   ESCAPE HTML
-========================= */
-
-function escapeHtml(text) {
-
-    const div = document.createElement("div");
-
-    div.textContent = text;
-
-    return div.innerHTML;
-
-}
-
-
-/* =========================
-   START
-========================= */
-
-loadChats();
+input.focus();
 
 </script>
 

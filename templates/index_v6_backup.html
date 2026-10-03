@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+   content="width=device-width, initial-scale=1.0">
+
+<title>MySpace V5</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+
+    background: white;
+    color: #222;
+
+    font-family: Arial, sans-serif;
+}
+
+.app {
+    display: flex;
+    height: 100vh;
+}
+
+
+/* SIDEBAR */
+
+.sidebar {
+
+    width: 280px;
+
+    flex-shrink: 0;
+
+    background: #f5f5f5;
+
+    border-right: 1px solid #ddd;
+
+    padding: 15px;
+
+    overflow-y: auto;
+}
+
+.logo {
+
+    font-size: 22px;
+
+    font-weight: bold;
+
+    padding: 12px;
+}
+
+.user {
+
+    color: #777;
+
+    padding:
+        8px 12px 15px;
+
+    font-size: 14px;
+}
+
+.logout {
+
+    display: block;
+
+    padding: 9px 12px;
+
+    color: #d33;
+
+    text-decoration: none;
+
+    border-radius: 7px;
+
+    margin-bottom: 15px;
+}
+
+.logout:hover {
+
+    background: #eee;
+}
+
+
+/* SEARCH */
+
+.search {
+
+    width: 100%;
+
+    padding: 10px 12px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 8px;
+
+    outline: none;
+
+    margin-bottom: 10px;
+
+    font-size: 14px;
+}
+
+.search:focus {
+
+    border-color: #999;
+}
+
+
+/* NEW PAGE */
+
+.new-page {
+
+    width: 100%;
+
+    border: 1px solid #ddd;
+
+    background: white;
+
+    color: #222;
+
+    padding: 12px;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 15px;
+
+    margin-bottom: 10px;
+}
+
+.new-page:hover {
+
+    background: #eee;
+}
+
+
+/* NEW FOLDER */
+
+.folder-button {
+
+    width: 100%;
+
+    border: none;
+
+    background: transparent;
+
+    text-align: left;
+
+    padding: 10px;
+
+    color: #666;
+
+    cursor: pointer;
+
+    border-radius: 7px;
+
+    margin-bottom: 10px;
+}
+
+.folder-button:hover {
+
+    background: #e8e8e8;
+}
+
+
+/* FOLDER FORM */
+
+.folder-form {
+
+    display: none;
+
+    margin-bottom: 15px;
+}
+
+.folder-form input {
+
+    width: 100%;
+
+    padding: 9px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 7px;
+
+    margin-bottom: 6px;
+}
+
+.folder-form button {
+
+    width: 100%;
+
+    padding: 8px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background: #2563eb;
+
+    color: white;
+
+    cursor: pointer;
+}
+
+
+/* SECTIONS */
+
+.section-title {
+
+    color: #888;
+
+    font-size: 12px;
+
+    text-transform: uppercase;
+
+    padding:
+        8px 10px;
+}
+
+
+/* PAGE */
+
+.page-link {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    color: #444;
+
+    text-decoration: none;
+
+    padding: 9px;
+
+    border-radius: 7px;
+
+    margin-bottom: 3px;
+}
+
+.page-link:hover {
+
+    background: #e9e9e9;
+}
+
+.page-link.active {
+
+    background: #e0e0e0;
+
+    color: #111;
+}
+
+.page-icon {
+
+    font-size: 17px;
+}
+
+.page-name {
+
+    flex: 1;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+}
+
+.star {
+
+    color: #f2b01e;
+
+    font-size: 14px;
+}
+
+
+/* FOLDERS */
+
+.folder {
+
+    margin-top: 15px;
+}
+
+.folder-name {
+
+    font-size: 13px;
+
+    color: #666;
+
+    padding: 8px 10px;
+}
+
+
+/* MAIN */
+
+.main {
+
+    flex: 1;
+
+    min-width: 0;
+
+    overflow-y: auto;
+
+    background: white;
+}
+
+.topbar {
+
+    height: 55px;
+
+    border-bottom: 1px solid #ddd;
+
+    display: flex;
+
+    align-items: center;
+
+    padding: 0 25px;
+
+    color: #777;
+}
+
+.save-status {
+
+    margin-left: auto;
+
+    font-size: 13px;
+
+    color: #777;
+}
+
+.save-status.saving {
+
+    color: #d99a00;
+}
+
+.save-status.saved {
+
+    color: #168344;
+}
+
+
+/* EDITOR */
+
+.editor {
+
+    max-width: 900px;
+
+    margin: auto;
+
+    padding:
+        60px 40px 100px;
+}
+
+.icon-input {
+
+    width: 65px;
+
+    height: 65px;
+
+    border: none;
+
+    outline: none;
+
+    background: #f5f5f5;
+
+    border-radius: 12px;
+
+    text-align: center;
+
+    font-size: 34px;
+
+    margin-bottom: 15px;
+}
+
+.title {
+
+    width: 100%;
+
+    border: none;
+
+    outline: none;
+
+    background: transparent;
+
+    color: #222;
+
+    font-size: 44px;
+
+    font-weight: bold;
+
+    margin-bottom: 25px;
+}
+
+.title::placeholder {
+
+    color: #aaa;
+}
+
+.content {
+
+    width: 100%;
+
+    min-height: 500px;
+
+    resize: vertical;
+
+    border: none;
+
+    outline: none;
+
+    background: transparent;
+
+    color: #333;
+
+    font-size: 18px;
+
+    line-height: 1.7;
+
+    font-family: Arial, sans-serif;
+}
+
+.content::placeholder {
+
+    color: #999;
+}
+
+
+/* CONTROLS */
+
+.controls {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    flex-wrap: wrap;
+
+    margin-top: 20px;
+}
+
+.save {
+
+    background: #2563eb;
+
+    color: white;
+
+    border: none;
+
+    padding: 10px 18px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+}
+
+.save:hover {
+
+    background: #1d4ed8;
+}
+
+.delete {
+
+    background: #ffe5e5;
+
+    color: #d33;
+
+    border: 1px solid #ffcccc;
+
+    padding: 10px 18px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+}
+
+.delete:hover {
+
+    background: #ffd5d5;
+}
+
+.favorite-button {
+
+    background: #fff8dc;
+
+    color: #a47700;
+
+    border: 1px solid #ead58a;
+
+    padding: 10px 18px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+}
+
+.move-select {
+
+    padding: 9px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 7px;
+
+    background: white;
+}
+
+
+/* WELCOME */
+
+.welcome {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    height:
+        calc(100vh - 55px);
+
+    text-align: center;
+}
+
+.welcome h1 {
+
+    font-size: 42px;
+}
+
+.welcome p {
+
+    color: #888;
+
+    font-size: 18px;
+}
+
+
+/* MOBILE */
+
+@media(max-width: 700px) {
+
+    .sidebar {
+
+        width: 220px;
+    }
+
+    .editor {
+
+        padding:
+            40px 20px 80px;
+    }
+
+    .title {
+
+        font-size: 32px;
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="app">
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+```
+<div class="logo">
+    🧠 MySpace V5
+</div>
+
+<div class="user">
+    👤 {{ session["username"] }}
+</div>
+
+<a
+    class="logout"
+    href="/logout"
+>
+    🚪 Logout
+</a>
+
+
+<!-- SEARCH -->
+
+<input
+    id="search"
+    class="search"
+    type="text"
+    placeholder="🔍 Search pages..."
+    autocomplete="off"
+>
+
+
+<!-- NEW PAGE -->
+
+<form
+    action="/new"
+    method="POST"
+>
+
+    <button
+        class="new-page"
+        type="submit"
+    >
+        ＋ New Page
+    </button>
+
+</form>
+
+
+<!-- NEW FOLDER -->
+
+<button
+    class="folder-button"
+    onclick="showFolderForm()"
+>
+    📁 ＋ New Folder
+</button>
+
+
+<form
+    id="folderForm"
+    class="folder-form"
+    action="/folder/new"
+    method="POST"
+>
+
+    <input
+        type="text"
+        name="name"
+        placeholder="Folder name"
+        required
+    >
+
+    <button type="submit">
+        Create Folder
+    </button>
+
+</form>
+
+
+<!-- FAVORITES -->
+
+<div class="section-title">
+    ⭐ Favorites
+</div>
+
+
+<div id="favoritePages">
+
+    {% for page in pages %}
+
+        {% if page["favorite"] %}
+
+        <a
+            class="page-link searchable"
+            data-title="{{ page['title']|lower }}"
+            href="/page/{{ page['id'] }}"
+        >
+
+            <span class="page-icon">
+                {{ page["icon"] }}
+            </span>
+
+            <span class="page-name">
+                {{ page["title"] }}
+            </span>
+
+            <span class="star">
+                ★
+            </span>
+
+        </a>
+
+        {% endif %}
+
+    {% endfor %}
+
+</div>
+
+
+<!-- ALL PAGES -->
+
+<div class="section-title">
+    📄 Pages
+</div>
+
+
+<div id="allPages">
+
+    {% for page in pages %}
+
+        <a
+            class="page-link searchable"
+            data-title="{{ page['title']|lower }}"
+            href="/page/{{ page['id'] }}"
+        >
+
+            <span class="page-icon">
+                {{ page["icon"] }}
+            </span>
+
+            <span class="page-name">
+                {{ page["title"] }}
+            </span>
+
+        </a>
+
+    {% endfor %}
+
+</div>
+
+
+<!-- FOLDERS -->
+
+{% for folder in folders %}
+
+    <div class="folder">
+
+        <div class="folder-name">
+
+            📁 {{ folder["name"] }}
+
+        </div>
+
+
+        {% for page in pages %}
+
+            {% if page["folder_id"] == folder["id"] %}
+
+            <a
+                class="page-link searchable"
+                data-title="{{ page['title']|lower }}"
+                href="/page/{{ page['id'] }}"
+            >
+
+                <span class="page-icon">
+                    {{ page["icon"] }}
+                </span>
+
+                <span class="page-name">
+                    {{ page["title"] }}
+                </span>
+
+            </a>
+
+            {% endif %}
+
+        {% endfor %}
+
+    </div>
+
+{% endfor %}
+```
+
+</aside>
+
+<!-- MAIN -->
+
+<main class="main">
+
+```
+<div class="topbar">
+
+    MySpace
+
+    {% if selected %}
+
+        <div
+            id="saveStatus"
+            class="save-status"
+        >
+            ✓ Saved
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+{% if selected %}
+
+<div class="editor">
+
+    <form
+        id="editorForm"
+        action="/save/{{ selected['id'] }}"
+        method="POST"
+    >
+
+
+        <!-- ICON -->
+
+        <input
+            id="icon"
+            class="icon-input"
+            type="text"
+            name="icon"
+            value="{{ selected['icon'] }}"
+            maxlength="4"
+            title="Page icon"
+        >
+
+
+        <!-- TITLE -->
+
+        <input
+            id="title"
+            class="title"
+            type="text"
+            name="title"
+            value="{{ selected['title'] }}"
+            placeholder="Untitled"
+            autocomplete="off"
+        >
+
+
+        <!-- CONTENT -->
+
+        <textarea
+            id="content"
+            class="content"
+            name="content"
+            placeholder="Start writing..."
+        >{{ selected['content'] }}</textarea>
+
+
+        <div class="controls">
+
+
+            <button
+                class="save"
+                type="submit"
+            >
+                💾 Save Now
+            </button>
+
+
+            <form
+                action="/favorite/{{ selected['id'] }}"
+                method="POST"
+            >
+            </form>
+
+
+            <button
+                class="favorite-button"
+                type="button"
+                onclick="toggleFavorite()"
+            >
+                {% if selected["favorite"] %}
+                    ⭐ Remove Favorite
+                {% else %}
+                    ☆ Add Favorite
+                {% endif %}
+            </button>
+
+
+            <select
+                id="folderSelect"
+                class="move-select"
+                onchange="movePage()"
+            >
+
+                <option value="">
+                    📁 No Folder
+                </option>
+
+                {% for folder in folders %}
+
+                <option
+                    value="{{ folder['id'] }}"
+                    {% if selected["folder_id"] == folder["id"] %}
+                    selected
+                    {% endif %}
+                >
+                    📁 {{ folder["name"] }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+
+            <button
+                class="delete"
+                type="button"
+                onclick="deletePage()"
+            >
+                🗑 Delete
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <form
+        id="deleteForm"
+        action="/delete/{{ selected['id'] }}"
+        method="POST"
+        style="display:none;"
+    >
+    </form>
+
+
+    <form
+        id="favoriteForm"
+        action="/favorite/{{ selected['id'] }}"
+        method="POST"
+        style="display:none;"
+    >
+    </form>
+
+
+    <form
+        id="moveForm"
+        action="/move/{{ selected['id'] }}"
+        method="POST"
+        style="display:none;"
+    >
+
+        <input
+            id="folderInput"
+            name="folder_id"
+        >
+
+    </form>
+
+</div>
+
+
+{% else %}
+
+
+<div class="welcome">
+
+    <div>
+
+        <h1>
+            🧠 Welcome to MySpace V5
+        </h1>
+
+        <p>
+            Create a page to get started.
+        </p>
+
+    </div>
+
+</div>
+
+
+{% endif %}
+```
+
+</main>
+
+</div>
+
+<script>
+
+/* =========================
+   SEARCH
+========================= */
+
+const search =
+    document.getElementById("search");
+
+const searchable =
+    document.querySelectorAll(".searchable");
+
+
+if (search) {
+
+    search.addEventListener(
+        "input",
+        function() {
+
+            const value =
+                this.value.toLowerCase().trim();
+
+            searchable.forEach(
+                function(page) {
+
+                    const title =
+                        page.dataset.title;
+
+                    if (
+                        title.includes(value)
+                    ) {
+
+                        page.style.display =
+                            "flex";
+
+                    } else {
+
+                        page.style.display =
+                            "none";
+
+                    }
+
+                }
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================
+   FOLDER FORM
+========================= */
+
+function showFolderForm() {
+
+    const form =
+        document.getElementById("folderForm");
+
+    if (
+        form.style.display === "block"
+    ) {
+
+        form.style.display = "none";
+
+    } else {
+
+        form.style.display = "block";
+
+        form.querySelector("input").focus();
+
+    }
+
+}
+
+
+/* =========================
+   AUTOSAVE
+========================= */
+
+let saveTimer = null;
+
+const titleInput =
+    document.getElementById("title");
+
+const contentInput =
+    document.getElementById("content");
+
+const iconInput =
+    document.getElementById("icon");
+
+const editorForm =
+    document.getElementById("editorForm");
+
+const saveStatus =
+    document.getElementById("saveStatus");
+
+
+function showSaving() {
+
+    if (!saveStatus) return;
+
+    saveStatus.textContent =
+        "Saving...";
+
+    saveStatus.className =
+        "save-status saving";
+
+}
+
+
+function showSaved() {
+
+    if (!saveStatus) return;
+
+    saveStatus.textContent =
+        "✓ Saved";
+
+    saveStatus.className =
+        "save-status saved";
+
+}
+
+
+function autoSave() {
+
+    if (!editorForm) return;
+
+    showSaving();
+
+    const formData =
+        new FormData(editorForm);
+
+    fetch(
+        editorForm.action,
+        {
+            method: "POST",
+            body: formData
+        }
+    )
+
+    .then(
+        function(response) {
+
+            if (response.ok) {
+
+                showSaved();
+
+            } else {
+
+                saveStatus.textContent =
+                    "Save failed";
+
+                saveStatus.className =
+                    "save-status";
+
+            }
+
+        }
+    )
+
+    .catch(
+        function() {
+
+            if (saveStatus) {
+
+                saveStatus.textContent =
+                    "Save failed";
+
+                saveStatus.className =
+                    "save-status";
+
+            }
+
+        }
+    );
+
+}
+
+
+function scheduleSave() {
+
+    if (saveTimer) {
+
+        clearTimeout(saveTimer);
+
+    }
+
+    showSaving();
+
+    saveTimer =
+        setTimeout(
+            autoSave,
+            800
+        );
+
+}
+
+
+if (titleInput) {
+
+    titleInput.addEventListener(
+        "input",
+        scheduleSave
+    );
+
+}
+
+
+if (contentInput) {
+
+    contentInput.addEventListener(
+        "input",
+        scheduleSave
+    );
+
+}
+
+
+if (iconInput) {
+
+    iconInput.addEventListener(
+        "input",
+        scheduleSave
+    );
+
+}
+
+
+if (editorForm) {
+
+    editorForm.addEventListener(
+        "submit",
+        function(event) {
+
+            event.preventDefault();
+
+            if (saveTimer) {
+
+                clearTimeout(saveTimer);
+
+            }
+
+            autoSave();
+
+        }
+    );
+
+}
+
+
+/* =========================
+   DELETE
+========================= */
+
+function deletePage() {
+
+    const answer =
+        confirm(
+            "Are you sure you want to delete this page?"
+        );
+
+    if (answer) {
+
+        document
+            .getElementById("deleteForm")
+            .submit();
+
+    }
+
+}
+
+
+/* =========================
+   FAVORITE
+========================= */
+
+function toggleFavorite() {
+
+    document
+        .getElementById("favoriteForm")
+        .submit();
+
+}
+
+
+/* =========================
+   MOVE PAGE
+========================= */
+
+function movePage() {
+
+    const select =
+        document.getElementById(
+            "folderSelect"
+        );
+
+    document
+        .getElementById(
+            "folderInput"
+        )
+        .value = select.value;
+
+    document
+        .getElementById(
+            "moveForm"
+        )
+        .submit();
+
+}
+
+</script>
+
+</body>
+
+</html>

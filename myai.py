@@ -1,137 +1,964 @@
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify
 import os
+import re
 import requests
-import sqlite3
-
+from datetime import datetime
 from dotenv import load_dotenv
 from google import genai
-from google.genai import types
+
+
+# =========================================================
+# SETUP
+# =========================================================
 
 load_dotenv()
 
 myai = Blueprint("myai", __name__)
 
-# =========================================================
-# GEMINI
-# =========================================================
-
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 print("MyAI API key loaded:", bool(GEMINI_API_KEY))
 
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(
-        api_key=GEMINI_API_KEY
-    )
-else:
-    gemini_client = None
-
-
-AI_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.7-flash",
-    "gemini-3.8-flash"
-]
 
 SEARXNG_URL = os.environ.get(
     "SEARXNG_URL",
-    "https://virtue-ind-moscow-javascript.trycloudflare.com"
+    "http://localhost:8080"
 )
 
-# =========================================================
-# DATABASE
-# =========================================================
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# Open-Meteo does not require an API key for normal
+# non-commercial API usage.
+OPEN_METEO_GEOCODING_URL = (
+    "https://geocoding-api.open-meteo.com/v1/search"
+)
 
-
-def get_db():
-    if DATABASE_URL:
-        import psycopg2
-
-        return psycopg2.connect(DATABASE_URL)
-
-    conn = sqlite3.connect("myspace.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+OPEN_METEO_WEATHER_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+)
 
 
-def setup_chat_database():
+if GEMINI_API_KEY:
 
-    conn = get_db()
+    gemini_client = genai.Client(
+        api_key=GEMINI_API_KEY
+    )
 
-    try:
-        cur = conn.cursor()
+else:
 
-        if DATABASE_URL:
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    title TEXT NOT NULL DEFAULT 'New Chat',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS messages (
-                    id SERIAL PRIMARY KEY,
-                    conversation_id INTEGER NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-        else:
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    title TEXT NOT NULL DEFAULT 'New Chat',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    conversation_id INTEGER NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-setup_chat_database()
+    gemini_client = None
 
 
 # =========================================================
-# USER
+# GEMINI MODELS
 # =========================================================
 
-def get_current_user_id():
+AI_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash"
+]
 
-    user_id = session.get("user_id")
 
-    if not user_id:
+# =========================================================
+# WEATHER HELPERS
+# =========================================================
+
+STATE_ABBREVIATIONS = {
+
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+
+    "DC": "District of Columbia"
+}
+
+
+# For a whole-state request, use the state capital as a
+# representative weather location.
+STATE_CAPITALS = {
+
+    "Alabama": "Montgomery, Alabama",
+    "Alaska": "Juneau, Alaska",
+    "Arizona": "Phoenix, Arizona",
+    "Arkansas": "Little Rock, Arkansas",
+    "California": "Sacramento, California",
+    "Colorado": "Denver, Colorado",
+    "Connecticut": "Hartford, Connecticut",
+    "Delaware": "Dover, Delaware",
+    "Florida": "Tallahassee, Florida",
+    "Georgia": "Atlanta, Georgia",
+    "Hawaii": "Honolulu, Hawaii",
+    "Idaho": "Boise, Idaho",
+    "Illinois": "Springfield, Illinois",
+    "Indiana": "Indianapolis, Indiana",
+    "Iowa": "Des Moines, Iowa",
+    "Kansas": "Topeka, Kansas",
+    "Kentucky": "Frankfort, Kentucky",
+    "Louisiana": "Baton Rouge, Louisiana",
+    "Maine": "Augusta, Maine",
+    "Maryland": "Annapolis, Maryland",
+    "Massachusetts": "Boston, Massachusetts",
+    "Michigan": "Lansing, Michigan",
+    "Minnesota": "Saint Paul, Minnesota",
+    "Mississippi": "Jackson, Mississippi",
+    "Missouri": "Jefferson City, Missouri",
+    "Montana": "Helena, Montana",
+    "Nebraska": "Lincoln, Nebraska",
+    "Nevada": "Carson City, Nevada",
+    "New Hampshire": "Concord, New Hampshire",
+    "New Jersey": "Trenton, New Jersey",
+    "New Mexico": "Santa Fe, New Mexico",
+    "New York": "Albany, New York",
+    "North Carolina": "Raleigh, North Carolina",
+    "North Dakota": "Bismarck, North Dakota",
+    "Ohio": "Columbus, Ohio",
+    "Oklahoma": "Oklahoma City, Oklahoma",
+    "Oregon": "Salem, Oregon",
+    "Pennsylvania": "Harrisburg, Pennsylvania",
+    "Rhode Island": "Providence, Rhode Island",
+    "South Carolina": "Columbia, South Carolina",
+    "South Dakota": "Pierre, South Dakota",
+    "Tennessee": "Nashville, Tennessee",
+    "Texas": "Austin, Texas",
+    "Utah": "Salt Lake City, Utah",
+    "Vermont": "Montpelier, Vermont",
+    "Virginia": "Richmond, Virginia",
+    "Washington": "Olympia, Washington",
+    "West Virginia": "Charleston, West Virginia",
+    "Wisconsin": "Madison, Wisconsin",
+    "Wyoming": "Cheyenne, Wyoming"
+}
+
+
+WEATHER_WORDS = [
+    "weather",
+    "wether",
+    "weater",
+    "weahter",
+    "forecast",
+    "temperature",
+    "temp",
+]
+
+def looks_like_weather_question(message):
+
+    text = message.lower().strip()
+
+    return any(
+        word in text
+        for word in WEATHER_WORDS
+    )
+
+def clean_weather_location(message):
+    text = message.strip()
+
+    # Normalize common weather typos.
+    text = re.sub(r"\bwether\b", "weather", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bweater\b", "weather", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bweahter\b", "weather", text, flags=re.IGNORECASE)
+
+    # Extract everything after "in", "for", or "at".
+    match = re.search(
+        r"\b(?:in|for|at)\s+(.+?)(?:\?|$)",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    if match:
+        text = match.group(1).strip()
+    else:
+        # No location was provided.
+        return ""
+
+    # Remove common trailing words.
+    text = re.sub(
+        r"\s+(?:right\s+now|currently|today|tonight)$",
+        "",
+        text,
+        flags=re.IGNORECASE
+    ).strip()
+
+    # Remove punctuation.
+    text = text.strip(" .,?!")
+
+    # Fix common city-name typos.
+    city_typos = {
+        "decader": "Decatur",
+        "decater": "Decatur",
+        "decatur": "Decatur",
+        "huntsvill": "Huntsville",
+        "huntsville": "Huntsville",
+        "montgomry": "Montgomery",
+        "montgomery": "Montgomery",
+    }
+
+    words_lower = text.lower().split()
+
+    # Handle phrases such as "north al decader".
+    if "decader" in words_lower or "decater" in words_lower:
+        return "Decatur, Alabama"
+
+    # State abbreviations.
+    state_abbreviations = {
+        "AL": "Alabama",
+        "AK": "Alaska",
+        "AZ": "Arizona",
+        "AR": "Arkansas",
+        "CA": "California",
+        "CO": "Colorado",
+        "CT": "Connecticut",
+        "DE": "Delaware",
+        "FL": "Florida",
+        "GA": "Georgia",
+        "HI": "Hawaii",
+        "ID": "Idaho",
+        "IL": "Illinois",
+        "IN": "Indiana",
+        "IA": "Iowa",
+        "KS": "Kansas",
+        "KY": "Kentucky",
+        "LA": "Louisiana",
+        "ME": "Maine",
+        "MD": "Maryland",
+        "MA": "Massachusetts",
+        "MI": "Michigan",
+        "MN": "Minnesota",
+        "MS": "Mississippi",
+        "MO": "Missouri",
+        "MT": "Montana",
+        "NE": "Nebraska",
+        "NV": "Nevada",
+        "NH": "New Hampshire",
+        "NJ": "New Jersey",
+        "NM": "New Mexico",
+        "NY": "New York",
+        "NC": "North Carolina",
+        "ND": "North Dakota",
+        "OH": "Ohio",
+        "OK": "Oklahoma",
+        "OR": "Oregon",
+        "PA": "Pennsylvania",
+        "RI": "Rhode Island",
+        "SC": "South Carolina",
+        "SD": "South Dakota",
+        "TN": "Tennessee",
+        "TX": "Texas",
+        "UT": "Utah",
+        "VT": "Vermont",
+        "VA": "Virginia",
+        "WA": "Washington",
+        "WV": "West Virginia",
+        "WI": "Wisconsin",
+        "WY": "Wyoming"
+    }
+
+    # Regional Alabama locations.
+    regional_states = {
+        "north al": "Huntsville, Alabama",
+        "north ala": "Huntsville, Alabama",
+        "north alabama": "Huntsville, Alabama",
+        "south al": "Mobile, Alabama",
+        "south ala": "Mobile, Alabama",
+        "south alabama": "Mobile, Alabama",
+        "central al": "Montgomery, Alabama",
+        "central ala": "Montgomery, Alabama",
+        "central alabama": "Montgomery, Alabama"
+    }
+
+    normalized = re.sub(
+        r"\s+",
+        " ",
+        text
+    ).strip().lower()
+
+    if normalized in regional_states:
+        return regional_states[normalized]
+
+    # State-only weather requests.
+    state_weather_cities = {
+        "alabama": "Montgomery, Alabama",
+        "alaska": "Anchorage, Alaska",
+        "arizona": "Phoenix, Arizona",
+        "arkansas": "Little Rock, Arkansas",
+        "california": "Los Angeles, California",
+        "colorado": "Denver, Colorado",
+        "connecticut": "Hartford, Connecticut",
+        "delaware": "Dover, Delaware",
+        "florida": "Tallahassee, Florida",
+        "georgia": "Atlanta, Georgia",
+        "hawaii": "Honolulu, Hawaii",
+        "idaho": "Boise, Idaho",
+        "illinois": "Springfield, Illinois",
+        "indiana": "Indianapolis, Indiana",
+        "iowa": "Des Moines, Iowa",
+        "kansas": "Topeka, Kansas",
+        "kentucky": "Frankfort, Kentucky",
+        "louisiana": "Baton Rouge, Louisiana",
+        "maine": "Augusta, Maine",
+        "maryland": "Annapolis, Maryland",
+        "massachusetts": "Boston, Massachusetts",
+        "michigan": "Lansing, Michigan",
+        "minnesota": "Saint Paul, Minnesota",
+        "mississippi": "Jackson, Mississippi",
+        "missouri": "Jefferson City, Missouri",
+        "montana": "Helena, Montana",
+        "nebraska": "Lincoln, Nebraska",
+        "nevada": "Carson City, Nevada",
+        "new hampshire": "Concord, New Hampshire",
+        "new jersey": "Trenton, New Jersey",
+        "new mexico": "Santa Fe, New Mexico",
+        "new york": "Albany, New York",
+        "north carolina": "Raleigh, North Carolina",
+        "north dakota": "Bismarck, North Dakota",
+        "ohio": "Columbus, Ohio",
+        "oklahoma": "Oklahoma City, Oklahoma",
+        "oregon": "Salem, Oregon",
+        "pennsylvania": "Harrisburg, Pennsylvania",
+        "rhode island": "Providence, Rhode Island",
+        "south carolina": "Columbia, South Carolina",
+        "south dakota": "Pierre, South Dakota",
+        "tennessee": "Nashville, Tennessee",
+        "texas": "Austin, Texas",
+        "utah": "Salt Lake City, Utah",
+        "vermont": "Montpelier, Vermont",
+        "virginia": "Richmond, Virginia",
+        "washington": "Olympia, Washington",
+        "west virginia": "Charleston, West Virginia",
+        "wisconsin": "Madison, Wisconsin",
+        "wyoming": "Cheyenne, Wyoming"
+    }
+
+    lower_text = text.lower()
+
+    if lower_text in state_weather_cities:
+        return state_weather_cities[lower_text]
+
+    # A location ending in a full state name.
+    for state_name in state_abbreviations.values():
+        if lower_text.endswith(" " + state_name.lower()):
+            city = text[
+                :len(text) - len(state_name)
+            ].strip(" ,")
+
+            if city:
+                return f"{city}, {state_name}"
+
+    # A city followed by a state abbreviation.
+    words = text.split()
+
+    if len(words) >= 2:
+        possible_state = words[-1].upper()
+
+        if possible_state in state_abbreviations:
+            city = " ".join(words[:-1]).strip()
+
+            if city:
+                return f"{city}, {state_abbreviations[possible_state]}"
+
+    # A state abbreviation by itself.
+    if text.upper() in state_abbreviations:
+        return state_weather_cities.get(
+            state_abbreviations[text.upper()].lower(),
+            state_abbreviations[text.upper()]
+        )
+
+    return text
+
+def geocode_weather_location(location):
+    """Convert a city/state name into latitude and longitude using Open-Meteo."""
+
+    if not location:
         return None
 
     try:
-        return int(user_id)
-    except (ValueError, TypeError):
+        response = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={
+                "name": location,
+                "count": 5,
+                "language": "en",
+                "format": "json"
+            },
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        results = data.get("results", [])
+
+        if not results:
+            return None
+
+        # Prefer a U.S. result when available.
+        for result in results:
+            if result.get("country_code") == "US":
+                return {
+                    "name": result.get("name", location),
+                    "latitude": result.get("latitude"),
+                    "longitude": result.get("longitude"),
+                    "country": result.get("country", "United States"),
+                    "state": result.get("admin1", "")
+                }
+
+        result = results[0]
+
+        return {
+            "name": result.get("name", location),
+            "latitude": result.get("latitude"),
+            "longitude": result.get("longitude"),
+            "country": result.get("country", ""),
+            "state": result.get("admin1", "")
+        }
+
+    except Exception as e:
+        print("Weather geocoding error:", e)
         return None
+
+def weather_code_description(code):
+    """Convert Open-Meteo weather codes into readable descriptions."""
+
+    descriptions = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Fog",
+        48: "Depositing rime fog",
+        51: "Light drizzle",
+        53: "Moderate drizzle",
+        55: "Dense drizzle",
+        56: "Light freezing drizzle",
+        57: "Dense freezing drizzle",
+        61: "Slight rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+        66: "Light freezing rain",
+        67: "Heavy freezing rain",
+        71: "Slight snow",
+        73: "Moderate snow",
+        75: "Heavy snow",
+        77: "Snow grains",
+        80: "Slight rain showers",
+        81: "Moderate rain showers",
+        82: "Violent rain showers",
+        85: "Slight snow showers",
+        86: "Heavy snow showers",
+        95: "Thunderstorm",
+        96: "Thunderstorm with slight hail",
+        99: "Thunderstorm with heavy hail",
+    }
+
+    return descriptions.get(code, "Unknown weather")
+
+def get_weather(location):
+
+    original_location = location
+
+    # Whole-state weather request.
+    if location in STATE_CAPITALS:
+
+        location = STATE_CAPITALS[location]
+
+        state_summary = (
+            f"This is a representative weather reading "
+            f"for {location}; weather can vary across "
+            f"the state."
+        )
+
+    else:
+
+        state_summary = ""
+
+    place = geocode_weather_location(
+        location
+    )
+
+    if not place:
+
+        return {
+            "success": False,
+            "error": (
+                f"I couldn't find weather information "
+                f"for {original_location}."
+            )
+        }
+
+    latitude = place.get(
+        "latitude"
+    )
+
+    longitude = place.get(
+        "longitude"
+    )
+
+    if latitude is None or longitude is None:
+
+        return {
+            "success": False,
+            "error": (
+                f"I couldn't determine the location "
+                f"for {original_location}."
+            )
+        }
+
+    try:
+
+        response = requests.get(
+            OPEN_METEO_WEATHER_URL,
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+
+                "current": (
+                    "temperature_2m,"
+                    "relative_humidity_2m,"
+                    "apparent_temperature,"
+                    "precipitation,"
+                    "rain,"
+                    "showers,"
+                    "snowfall,"
+                    "weather_code,"
+                    "cloud_cover,"
+                    "wind_speed_10m,"
+                    "wind_direction_10m"
+                ),
+
+                "daily": (
+                    "weather_code,"
+                    "temperature_2m_max,"
+                    "temperature_2m_min,"
+                    "precipitation_probability_max,"
+                    "precipitation_sum"
+                ),
+
+                "temperature_unit": "fahrenheit",
+
+                "wind_speed_unit": "mph",
+
+                "precipitation_unit": "inch",
+
+                "timezone": "auto",
+
+                "forecast_days": 3
+            },
+
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        current = data.get(
+            "current",
+            {}
+        )
+
+        daily = data.get(
+            "daily",
+            {}
+        )
+
+        weather_code = current.get(
+            "weather_code"
+        )
+
+        description = weather_code_description(
+            weather_code
+        )
+
+        current_time = current.get(
+            "time",
+            ""
+        )
+
+        result = {
+
+            "success": True,
+
+            "requested_location":
+                original_location,
+
+            "location_name":
+                place.get(
+                    "name",
+                    original_location
+                ),
+
+            "state":
+                place.get(
+                    "admin1",
+                    ""
+                ),
+
+            "country":
+                place.get(
+                    "country",
+                    ""
+                ),
+
+            "latitude":
+                latitude,
+
+            "longitude":
+                longitude,
+
+            "timezone":
+                data.get(
+                    "timezone",
+                    ""
+                ),
+
+            "time":
+                current_time,
+
+            "description":
+                description,
+
+            "temperature":
+                current.get(
+                    "temperature_2m"
+                ),
+
+            "apparent_temperature":
+                current.get(
+                    "apparent_temperature"
+                ),
+
+            "humidity":
+                current.get(
+                    "relative_humidity_2m"
+                ),
+
+            "precipitation":
+                current.get(
+                    "precipitation"
+                ),
+
+            "rain":
+                current.get(
+                    "rain"
+                ),
+
+            "showers":
+                current.get(
+                    "showers"
+                ),
+
+            "snowfall":
+                current.get(
+                    "snowfall"
+                ),
+
+            "cloud_cover":
+                current.get(
+                    "cloud_cover"
+                ),
+
+            "wind_speed":
+                current.get(
+                    "wind_speed_10m"
+                ),
+
+            "wind_direction":
+                current.get(
+                    "wind_direction_10m"
+                ),
+
+            "daily":
+                daily,
+
+            "state_summary":
+                state_summary
+        }
+
+        return result
+
+    except Exception as e:
+
+        print(
+            "MyAI weather API error:",
+            e
+        )
+
+        return {
+            "success": False,
+            "error": (
+                "The weather service could not "
+                "be reached right now."
+            )
+        }
+
+
+def format_weather_context(weather):
+
+    if not weather.get("success"):
+
+        return ""
+
+    daily = weather.get(
+        "daily",
+        {}
+    )
+
+    dates = daily.get(
+        "time",
+        []
+    )
+
+    max_temps = daily.get(
+        "temperature_2m_max",
+        []
+    )
+
+    min_temps = daily.get(
+        "temperature_2m_min",
+        []
+    )
+
+    rain_probability = daily.get(
+        "precipitation_probability_max",
+        []
+    )
+
+    precipitation = daily.get(
+        "precipitation_sum",
+        []
+    )
+
+    forecast_lines = []
+
+    for index, date in enumerate(
+        dates[:3]
+    ):
+
+        maximum = (
+            max_temps[index]
+            if index < len(max_temps)
+            else None
+        )
+
+        minimum = (
+            min_temps[index]
+            if index < len(min_temps)
+            else None
+        )
+
+        probability = (
+            rain_probability[index]
+            if index < len(rain_probability)
+            else None
+        )
+
+        rain_amount = (
+            precipitation[index]
+            if index < len(precipitation)
+            else None
+        )
+
+        # Convert the API date into the correct weekday.
+        try:
+            forecast_date = datetime.strptime(
+                date,
+                "%Y-%m-%d"
+            )
+
+            if index == 0:
+                day_name = "Today"
+            elif index == 1:
+                day_name = "Tomorrow"
+            else:
+                day_name = forecast_date.strftime("%A")
+
+            display_date = forecast_date.strftime("%b %-d")
+        except Exception:
+            day_name = date
+            display_date = date
+
+        forecast_lines.append(
+            f"{day_name} ({display_date}): "
+            f"low={minimum}°F, "
+            f"high={maximum}°F, "
+            f"precipitation chance={probability}%, "
+            f"precipitation={rain_amount} in"
+        )
+
+    forecast_text = "\n".join(
+        forecast_lines
+    )
+
+    return f"""
+LIVE WEATHER DATA
+
+Location:
+{weather["location_name"]}, {weather["state"]}
+
+Timezone:
+{weather["timezone"]}
+
+Current observation time:
+{weather["time"]}
+
+Current conditions:
+{weather["description"]}
+
+Temperature:
+{weather["temperature"]}°F
+
+Feels like:
+{weather["apparent_temperature"]}°F
+
+Humidity:
+{weather["humidity"]}%
+
+Wind:
+{weather["wind_speed"]} mph
+
+Wind direction:
+{weather["wind_direction"]}°
+
+Cloud cover:
+{weather["cloud_cover"]}%
+
+Rain:
+{weather["rain"]} in
+
+Showers:
+{weather["showers"]} in
+
+Snow:
+{weather["snowfall"]} in
+
+{weather["state_summary"]}
+
+3-DAY FORECAST:
+{forecast_text}
+
+Weather data source:
+Open-Meteo
+"""
+
+
+# =========================================================
+# SEARXNG WEB SEARCH
+# =========================================================
+
+def ai_web_search(query):
+
+    try:
+
+        response = requests.get(
+            f"{SEARXNG_URL}/search",
+
+            params={
+                "q": query,
+                "format": "json",
+                "categories": "general"
+            },
+
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        results = []
+
+        for result in data.get(
+            "results",
+            []
+        )[:8]:
+
+            title = result.get(
+                "title",
+                ""
+            )
+
+            content = result.get(
+                "content",
+                ""
+            )
+
+            url = result.get(
+                "url",
+                ""
+            )
+
+            if title and url:
+
+                results.append({
+
+                    "title":
+                        title,
+
+                    "content":
+                        content,
+
+                    "url":
+                        url
+                })
+
+        return results
+
+    except Exception as e:
+
+        print(
+            "MyAI search error:",
+            e
+        )
+
+        return []
 
 
 # =========================================================
@@ -141,894 +968,168 @@ def get_current_user_id():
 @myai.route("/ai")
 def ai_page():
 
-    user_id = get_current_user_id()
-
-    if not user_id:
-        return "Please log in to use MyAI.", 401
-
     return render_template(
-        "ai.html",
-        username=session.get("username", "User")
+        "ai.html"
     )
 
 
 # =========================================================
-# LIST CHATS
-# =========================================================
-
-@myai.route("/api/conversations", methods=["GET"])
-def get_conversations():
-
-    user_id = get_current_user_id()
-
-    if not user_id:
-        return jsonify({
-            "error": "You must be logged in."
-        }), 401
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                SELECT
-                    id,
-                    title,
-                    created_at,
-                    updated_at
-                FROM conversations
-                WHERE user_id = %s
-                ORDER BY updated_at DESC
-            """, (user_id,))
-
-            rows = cur.fetchall()
-
-            conversations = []
-
-            for row in rows:
-
-                conversations.append({
-                    "id": row[0],
-                    "title": row[1],
-                    "created_at": str(row[2]),
-                    "updated_at": str(row[3])
-                })
-
-        else:
-
-            cur.execute("""
-                SELECT
-                    id,
-                    title,
-                    created_at,
-                    updated_at
-                FROM conversations
-                WHERE user_id = ?
-                ORDER BY updated_at DESC
-            """, (user_id,))
-
-            rows = cur.fetchall()
-
-            conversations = [
-                {
-                    "id": row["id"],
-                    "title": row["title"],
-                    "created_at": row["created_at"],
-                    "updated_at": row["updated_at"]
-                }
-                for row in rows
-            ]
-
-        return jsonify({
-            "conversations": conversations
-        })
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# CREATE CHAT
-# =========================================================
-
-@myai.route("/api/conversations", methods=["POST"])
-def create_conversation():
-
-    user_id = get_current_user_id()
-
-    if not user_id:
-        return jsonify({
-            "error": "You must be logged in."
-        }), 401
-
-    data = request.get_json(silent=True) or {}
-
-    title = data.get(
-        "title",
-        "New Chat"
-    ).strip()
-
-    if not title:
-        title = "New Chat"
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                INSERT INTO conversations
-                    (user_id, title)
-                VALUES
-                    (%s, %s)
-                RETURNING id
-            """, (
-                user_id,
-                title
-            ))
-
-            conversation_id = cur.fetchone()[0]
-
-        else:
-
-            cur.execute("""
-                INSERT INTO conversations
-                    (user_id, title)
-                VALUES
-                    (?, ?)
-            """, (
-                user_id,
-                title
-            ))
-
-            conversation_id = cur.lastrowid
-
-        conn.commit()
-
-        return jsonify({
-            "id": conversation_id,
-            "title": title
-        })
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# GET CHAT
+# AI CHAT
 # =========================================================
 
 @myai.route(
-    "/api/conversations/<int:conversation_id>",
-    methods=["GET"]
+    "/api/ai",
+    methods=["POST"]
 )
-def get_conversation(conversation_id):
-
-    user_id = get_current_user_id()
-
-    if not user_id:
-        return jsonify({
-            "error": "You must be logged in."
-        }), 401
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                SELECT
-                    id,
-                    title,
-                    created_at,
-                    updated_at
-                FROM conversations
-                WHERE id = %s
-                AND user_id = %s
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            conversation = cur.fetchone()
-
-            if not conversation:
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-            cur.execute("""
-                SELECT
-                    role,
-                    content,
-                    created_at
-                FROM messages
-                WHERE conversation_id = %s
-                ORDER BY id ASC
-            """, (conversation_id,))
-
-            messages = [
-                {
-                    "role": row[0],
-                    "content": row[1],
-                    "created_at": str(row[2])
-                }
-                for row in cur.fetchall()
-            ]
-
-            return jsonify({
-                "conversation": {
-                    "id": conversation[0],
-                    "title": conversation[1],
-                    "created_at": str(conversation[2]),
-                    "updated_at": str(conversation[3])
-                },
-                "messages": messages
-            })
-
-        else:
-
-            cur.execute("""
-                SELECT
-                    id,
-                    title,
-                    created_at,
-                    updated_at
-                FROM conversations
-                WHERE id = ?
-                AND user_id = ?
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            conversation = cur.fetchone()
-
-            if not conversation:
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-            cur.execute("""
-                SELECT
-                    role,
-                    content,
-                    created_at
-                FROM messages
-                WHERE conversation_id = ?
-                ORDER BY id ASC
-            """, (conversation_id,))
-
-            messages = [
-                {
-                    "role": row["role"],
-                    "content": row["content"],
-                    "created_at": row["created_at"]
-                }
-                for row in cur.fetchall()
-            ]
-
-            return jsonify({
-                "conversation": {
-                    "id": conversation["id"],
-                    "title": conversation["title"],
-                    "created_at": conversation["created_at"],
-                    "updated_at": conversation["updated_at"]
-                },
-                "messages": messages
-            })
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# DELETE CHAT
-# =========================================================
-
-@myai.route(
-    "/api/conversations/<int:conversation_id>",
-    methods=["DELETE"]
-)
-def delete_conversation(conversation_id):
-
-    user_id = get_current_user_id()
-
-    if not user_id:
-        return jsonify({
-            "error": "You must be logged in."
-        }), 401
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                SELECT id
-                FROM conversations
-                WHERE id = %s
-                AND user_id = %s
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            if not cur.fetchone():
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-            cur.execute("""
-                DELETE FROM messages
-                WHERE conversation_id = %s
-            """, (conversation_id,))
-
-            cur.execute("""
-                DELETE FROM conversations
-                WHERE id = %s
-                AND user_id = %s
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-        else:
-
-            cur.execute("""
-                SELECT id
-                FROM conversations
-                WHERE id = ?
-                AND user_id = ?
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            if not cur.fetchone():
-
-                return jsonify({
-                    "error": "Chat not found."
-                }), 404
-
-            cur.execute("""
-                DELETE FROM messages
-                WHERE conversation_id = ?
-            """, (conversation_id,))
-
-            cur.execute("""
-                DELETE FROM conversations
-                WHERE id = ?
-                AND user_id = ?
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-        conn.commit()
-
-        return jsonify({
-            "success": True
-        })
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# SAVE MESSAGE
-# =========================================================
-
-def save_message(
-    conversation_id,
-    role,
-    content
-):
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                INSERT INTO messages
-                    (conversation_id, role, content)
-                VALUES
-                    (%s, %s, %s)
-            """, (
-                conversation_id,
-                role,
-                content
-            ))
-
-            cur.execute("""
-                UPDATE conversations
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (conversation_id,))
-
-        else:
-
-            cur.execute("""
-                INSERT INTO messages
-                    (conversation_id, role, content)
-                VALUES
-                    (?, ?, ?)
-            """, (
-                conversation_id,
-                role,
-                content
-            ))
-
-            cur.execute("""
-                UPDATE conversations
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (conversation_id,))
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# CHAT HISTORY
-# =========================================================
-
-def get_chat_history(conversation_id):
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                SELECT role, content
-                FROM messages
-                WHERE conversation_id = %s
-                ORDER BY id ASC
-            """, (conversation_id,))
-
-            rows = cur.fetchall()
-
-            history = []
-
-            for row in rows:
-
-                history.append(
-                    f"{row[0].upper()}: {row[1]}"
-                )
-
-        else:
-
-            cur.execute("""
-                SELECT role, content
-                FROM messages
-                WHERE conversation_id = ?
-                ORDER BY id ASC
-            """, (conversation_id,))
-
-            rows = cur.fetchall()
-
-            history = []
-
-            for row in rows:
-
-                history.append(
-                    f"{row['role'].upper()}: {row['content']}"
-                )
-
-        return "\n\n".join(history)
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# UPDATE TITLE
-# =========================================================
-
-def update_chat_title(
-    conversation_id,
-    title
-):
-
-    conn = get_db()
-
-    try:
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                UPDATE conversations
-                SET title = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (
-                title,
-                conversation_id
-            ))
-
-        else:
-
-            cur.execute("""
-                UPDATE conversations
-                SET title = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (
-                title,
-                conversation_id
-            ))
-
-        conn.commit()
-
-    finally:
-        conn.close()
-
-
-# =========================================================
-# GEMINI REQUEST
-# =========================================================
-def ask_gemini(prompt, use_search=True):
-    if not gemini_client:
-        raise RuntimeError("GEMINI_API_KEY is not configured.")
-
-    last_error = None
-
-    # =========================
-    # LIVE INTERNET SEARCH
-    # =========================
-    if use_search:
-        try:
-            print("MyAI searching the internet with SearXNG...")
-
-            # Search only the user's actual question.
-            search_query = prompt
-
-            # If this is the full MyAI prompt, extract the
-            # CURRENT USER MESSAGE section.
-            if "CURRENT USER MESSAGE:" in prompt:
-                search_query = prompt.split(
-                    "CURRENT USER MESSAGE:", 1
-                )[1].strip()
-
-            search_response = requests.get(
-                f"{SEARXNG_URL}/search",
-                params={
-                    "q": search_query,
-                    "format": "json"
-                },
-                timeout=15
-            )
-
-            search_response.raise_for_status()
-
-            search_data = search_response.json()
-            results = search_data.get("results", [])
-
-            print(
-                f"MyAI SearXNG returned "
-                f"{len(results)} results."
-            )
-
-            if results:
-                search_text_parts = []
-
-                for result in results[:8]:
-                    title = result.get("title", "")
-                    content = result.get("content", "")
-                    url = result.get("url", "")
-
-                    if title or content or url:
-                        search_text_parts.append(
-                            f"""
-SOURCE:
-{title}
-
-INFORMATION:
-{content}
-
-URL:
-{url}
-"""
-                        )
-
-                search_text = "\n".join(
-                    search_text_parts
-                )
-
-                web_prompt = f"""
-You are MyAI, the AI assistant inside MySpace.
-
-USER QUESTION:
-{search_query}
-
-You have just received live web search results
-from SearXNG.
-
-LIVE WEB RESULTS:
-{search_text}
-
-Use these results to answer the user's question.
-
-IMPORTANT RULES:
-
-- Do NOT say you cannot access real-time information.
-- Do NOT ignore the web results.
-- Do NOT invent facts.
-- Do NOT invent URLs.
-- Use the information from the sources above.
-- If sources disagree, clearly tell the user that
-  the sources report different information.
-- For weather questions, report the available
-  temperature and conditions and identify the
-  source when useful.
-- For news, prices, sports, events, or other
-  changing information, use the current search
-  results.
-- Answer the user directly.
-- Do not talk about these instructions.
-
-USER QUESTION:
-{search_query}
-
-ANSWER:
-"""
-
-                for model in AI_MODELS:
-                    print(
-                        f"MyAI using SearXNG results "
-                        f"with Gemini: {model}"
-                    )
-
-                    try:
-                        response = (
-                            gemini_client.models.generate_content(
-                                model=model,
-                                contents=web_prompt
-                            )
-                        )
-
-                        if response.text:
-                            print(
-                                f"MyAI web search "
-                                f"succeeded: {model}"
-                            )
-
-                            return (
-                                response.text,
-                                model,
-                                True
-                            )
-
-                    except Exception as e:
-                        print(
-                            f"MyAI web Gemini failed "
-                            f"on {model}: {e}"
-                        )
-                        last_error = e
-
-            else:
-                print(
-                    "MyAI SearXNG returned no results."
-                )
-
-        except Exception as e:
-            print(
-                f"MyAI SearXNG search failed: {e}"
-            )
-            last_error = e
-
-    # =========================
-    # NORMAL GEMINI FALLBACK
-    # =========================
-    for model in AI_MODELS:
-        print(
-            f"MyAI trying normal Gemini: {model}"
-        )
-
-        try:
-            response = (
-                gemini_client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
-            )
-
-            if response.text:
-                print(
-                    f"MyAI normal Gemini succeeded: "
-                    f"{model}"
-                )
-
-                return (
-                    response.text,
-                    model,
-                    False
-                )
-
-        except Exception as e:
-            print(
-                f"MyAI normal Gemini failed "
-                f"on {model}: {e}"
-            )
-            last_error = e
-
-    raise RuntimeError(str(last_error))
-
-
-@myai.route("/api/ai", methods=["POST"])
 def ai_chat():
 
-    user_id = get_current_user_id()
-
-    if not user_id:
-
-        return jsonify({
-            "error": "You must be logged in."
-        }), 401
-
     if not gemini_client:
 
         return jsonify({
-            "error": (
+
+            "error":
                 "MyAI is not configured. "
                 "Add GEMINI_API_KEY."
-            )
+
         }), 500
+
 
     data = request.get_json(
         silent=True
     ) or {}
+
 
     message = data.get(
         "message",
         ""
     ).strip()
 
-    conversation_id = data.get(
-        "conversation_id"
-    )
 
     if not message:
 
         return jsonify({
-            "error": "Please enter a message."
+
+            "error":
+                "Please enter a message."
+
         }), 400
 
-    if not conversation_id:
 
-        return jsonify({
-            "error": "Please select or create a chat."
-        }), 400
+    conversation = data.get(
+        "conversation",
+        ""
+    )
 
-    try:
 
-        conversation_id = int(
-            conversation_id
+    # =====================================================
+    # WEATHER
+    # =====================================================
+
+    weather = None
+
+    if looks_like_weather_question(
+        message
+    ):
+
+        weather_location = (
+            clean_weather_location(
+                message
+            )
         )
 
-    except (ValueError, TypeError):
+        if not weather_location:
+            return jsonify({
+                "answer": "Sure! What city or location would you like the weather for?",
+                "model": "weather",
+                "sources": []
+            })
 
-        return jsonify({
-            "error": "Invalid conversation ID."
-        }), 400
+        # Handle "AL" and other states.
+        state_name = None
 
+        if weather_location:
 
-    # =====================================================
-    # CHECK CHAT OWNERSHIP
-    # =====================================================
+            if weather_location in STATE_CAPITALS:
 
-    conn = get_db()
+                state_name = (
+                    weather_location
+                )
 
-    try:
+        if state_name:
 
-        cur = conn.cursor()
-
-        if DATABASE_URL:
-
-            cur.execute("""
-                SELECT id, title
-                FROM conversations
-                WHERE id = %s
-                AND user_id = %s
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            conversation = cur.fetchone()
+            weather = get_weather(
+                state_name
+            )
 
         else:
 
-            cur.execute("""
-                SELECT id, title
-                FROM conversations
-                WHERE id = ?
-                AND user_id = ?
-            """, (
-                conversation_id,
-                user_id
-            ))
-
-            conversation = cur.fetchone()
-
-    finally:
-
-        conn.close()
-
-
-    if not conversation:
-
-        return jsonify({
-            "error": "Chat not found."
-        }), 404
+            weather = get_weather(
+                weather_location
+            )
 
 
     # =====================================================
-    # SAVE USER MESSAGE
+    # NORMAL WEB SEARCH
     # =====================================================
 
-    save_message(
-        conversation_id,
-        "user",
-        message
-    )
+    results = []
 
+    # Weather questions use the weather API instead
+    # of wasting the search query on normal web search.
+    if not weather:
 
-    # =====================================================
-    # CHAT TITLE
-    # =====================================================
-
-    if DATABASE_URL:
-
-        current_title = conversation[1]
-
-    else:
-
-        current_title = conversation["title"]
-
-
-    if current_title == "New Chat":
-
-        new_title = message[:50]
-
-        if len(message) > 50:
-
-            new_title += "..."
-
-        update_chat_title(
-            conversation_id,
-            new_title
+        results = ai_web_search(
+            message
         )
 
 
     # =====================================================
-    # HISTORY
+    # SEARCH CONTEXT
     # =====================================================
 
-    conversation_history = get_chat_history(
-        conversation_id
+    search_context_parts = []
+
+    for result in results:
+
+        search_context_parts.append(
+
+            f"Title: {result['title']}\n"
+            f"Content: {result['content']}\n"
+            f"URL: {result['url']}"
+
+        )
+
+
+    search_context = "\n\n".join(
+        search_context_parts
     )
+
+
+    # =====================================================
+    # WEATHER CONTEXT
+    # =====================================================
+
+    weather_context = ""
+
+    if weather:
+
+        if weather.get("success"):
+
+            weather_context = (
+                format_weather_context(
+                    weather
+                )
+            )
+
+        else:
+
+            weather_context = (
+                "WEATHER ERROR:\n"
+                + weather.get(
+                    "error",
+                    "Unknown weather error."
+                )
+            )
 
 
     # =====================================================
@@ -1038,93 +1139,197 @@ def ai_chat():
     prompt = f"""
 You are MyAI, the AI assistant built into MySpace.
 
-You are helpful, honest, friendly, and clear.
-
-You may have access to Google Search.
-
-If search results are available, use them when relevant.
-
-If web search is unavailable, answer normally using your
-existing knowledge and clearly avoid pretending that you
-looked something up.
-
-IMPORTANT:
-
-- Do not invent facts.
-- Do not invent URLs.
-- Do not claim you searched if you did not.
-- When current information is requested, try to use search.
-- If search is unavailable, tell the user that live search
-  is temporarily unavailable if that matters to the answer.
+You are helpful, honest, clear, and friendly.
 
 SAFETY RULES:
 
-- Do not help steal passwords, accounts, money, or personal
-  information.
-- Do not provide malware, ransomware, spyware, or
-  credential-stealing code.
+- Do not help steal passwords, accounts, money, or personal information.
+- Do not provide malware, ransomware, spyware, or credential-stealing code.
 - Do not help bypass security systems without authorization.
-- For cybersecurity questions, focus on defensive and
-  authorized security.
+- For cybersecurity questions, focus on defensive and authorized security.
 - Do not provide instructions for seriously harming someone.
-- If a request is unsafe, briefly explain that you cannot help.
+- If a request is unsafe, briefly explain that you cannot help with it.
 
-CONVERSATION HISTORY:
+IMPORTANT WEATHER RULE:
 
-{conversation_history}
+If LIVE WEATHER DATA is provided below, use that data for weather questions.
+
+Do not replace the live weather data with random search results.
+
+If the user asks about "AL", "Alabama", or another state,
+explain that the weather shown for a whole state is a representative
+location and that conditions can vary across the state.
+
+LIVE WEATHER DATA:
+
+{weather_context}
+
+INTERNET SEARCH RESULTS:
+
+{search_context}
+
+CONVERSATION:
+
+{conversation}
 
 CURRENT USER MESSAGE:
 
 {message}
 
-ANSWER THE USER DIRECTLY.
+ANSWER RULES:
+
+- Answer the user clearly and directly.
+- Use LIVE WEATHER DATA for weather questions.
+- Use internet search results when they are relevant.
+- Do not invent facts.
+- Do not invent URLs.
+- If a weather question has live weather data, give the current
+  temperature, conditions, feels-like temperature, humidity,
+  wind, and useful forecast information when appropriate.
+- Use Fahrenheit for temperatures.
+- Keep weather answers easy to read.
+- If the user asks about a whole state, mention the representative
+  city being used.
+- When giving the user a website, article, page, video, or other
+  online resource, make it a clickable Markdown link.
+- Use this exact format:
+
+  [Website Name](URL)
+
+- Always use the actual URL from the search results.
+- Never make up a URL.
+- If the user specifically asks for a link, provide the relevant
+  clickable link.
+- If multiple useful sources are available, you may provide multiple
+  clickable links.
 """
 
 
     # =====================================================
-    # ASK GEMINI
+    # GEMINI MODEL FALLBACK
     # =====================================================
 
-    try:
+    last_error = None
 
-        answer, model, used_search = ask_gemini(
-            prompt,
-            use_search=True
-        )
 
-    except Exception as e:
+    for model in AI_MODELS:
 
         print(
-            "MyAI final error:",
-            str(e)
+            f"MyAI trying model: {model}"
         )
 
-        return jsonify({
-            "error": (
-                "MyAI could not get a response. "
-                f"{str(e)}"
+
+        try:
+
+            response = (
+                gemini_client
+                .models
+                .generate_content(
+                    model=model,
+                    contents=prompt
+                )
             )
-        }), 503
+
+
+            answer = response.text
+
+
+            print(
+                f"MyAI succeeded with model: {model}"
+            )
+
+
+            return jsonify({
+
+                "answer":
+                    answer,
+
+                "sources":
+                    results,
+
+                "model":
+                    model
+
+            })
+
+
+        except Exception as e:
+
+            error_text = str(e)
+
+
+            print(
+                f"MyAI model {model} failed: "
+                f"{error_text}"
+            )
+
+
+            last_error = e
+
+
+            if (
+                "429" in error_text
+                or
+                "RESOURCE_EXHAUSTED"
+                in error_text
+            ):
+
+                print(
+                    f"MyAI quota reached for "
+                    f"{model}. Trying next model."
+                )
+
+                continue
+
+
+            if (
+                "503" in error_text
+                or
+                "UNAVAILABLE"
+                in error_text
+            ):
+
+                print(
+                    f"MyAI temporary overload "
+                    f"on {model}. Trying next model."
+                )
+
+                continue
+
+
+            if (
+                "404" in error_text
+                or
+                "NOT_FOUND"
+                in error_text
+            ):
+
+                print(
+                    f"MyAI model {model} "
+                    f"unavailable. Trying next model."
+                )
+
+                continue
+
+
+            print(
+                f"MyAI error on {model}. "
+                f"Trying next model."
+            )
+
+            continue
 
 
     # =====================================================
-    # SAVE AI RESPONSE
-    # =====================================================
-
-    save_message(
-        conversation_id,
-        "assistant",
-        answer
-    )
-
-
-    # =====================================================
-    # RETURN RESPONSE
+    # ALL MODELS FAILED
     # =====================================================
 
     return jsonify({
-        "answer": answer,
-        "sources": [],
-        "model": model,
-        "web_search": used_search
-    })
+
+        "error": (
+            "MyAI could not get a response "
+            "from any available Gemini model. "
+            f"Last error: {last_error}"
+        )
+
+    }), 503
