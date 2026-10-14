@@ -5,3 +5,7 @@ psycopg2-binary
 google-genai
 requests
 python-dotenv
+pypdf
+python-docx
+pandas
+openpyxl

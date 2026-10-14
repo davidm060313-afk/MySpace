@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyAI - MySpace</title>
+    <title>Nova AI - NovaHub</title>
 
     <style>
         * {
@@ -192,7 +192,7 @@
 <div class="app">
 
     <aside class="sidebar">
-        <div class="logo">🤖 MyAI</div>
+        <div class="logo">🤖 Nova AI</div>
 
         <button class="new-chat" onclick="newChat()">
             + New Chat
@@ -204,13 +204,13 @@
     <main class="main">
 
         <div class="header">
-            MyAI
+            Nova Ai
         </div>
 
         <div id="messages" class="messages">
             <div class="empty" id="emptyMessage">
                 <h2>👋 Hi!</h2>
-                <p>I'm MyAI, your assistant inside MySpace.</p>
+                <p>I'm Nova AI, your assistant inside NovaHub.</p>
                 <p>Ask me anything.</p>
             </div>
         </div>
@@ -221,7 +221,7 @@
                 <input
                     id="messageInput"
                     type="text"
-                    placeholder="Ask MyAI anything..."
+                    placeholder="Ask Nova AI anything..."
                     autocomplete="off"
                 >
 
@@ -336,8 +336,8 @@ async function sendMessage() {
 
         const responseText = await response.text();
 
-        console.log("MyAI API status:", response.status);
-        console.log("MyAI API response:", responseText);
+        console.log("Nova AI API status:", response.status);
+        console.log("Nova AI API response:", responseText);
 
         let data;
 
@@ -349,7 +349,7 @@ async function sendMessage() {
             console.error("Server returned:", responseText);
 
             throw new Error(
-                "The MyAI server did not return valid JSON."
+                "The Nova AI server did not return valid JSON."
             );
         }
 
@@ -358,7 +358,7 @@ async function sendMessage() {
             throw new Error(
                 data.error ||
                 data.message ||
-                "MyAI returned an error."
+                "Nova AI returned an error."
             );
         }
 
@@ -366,7 +366,7 @@ async function sendMessage() {
             data.answer ||
             data.response ||
             data.reply ||
-            "MyAI did not return an answer.";
+            "Nova AI did not return an answer.";
 
         addMessage(
             answer,
@@ -376,10 +376,10 @@ async function sendMessage() {
 
     } catch (error) {
 
-        console.error("MyAI error:", error);
+        console.error("Nova AI error:", error);
 
         addMessage(
-            "Sorry, MyAI had a problem: " + error.message,
+            "Sorry, Nova AI had a problem: " + error.message,
             "ai"
         );
 
@@ -399,7 +399,7 @@ function newChat() {
     messagesDiv.innerHTML = `
         <div class="empty" id="emptyMessage">
             <h2>👋 Hi!</h2>
-            <p>I'm MyAI, your assistant inside MySpace.</p>
+            <p>I'm Nova AI, your assistant inside NovaHub.</p>
             <p>Ask me anything.</p>
         </div>
     `;

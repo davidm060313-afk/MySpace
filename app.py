@@ -1016,6 +1016,7 @@ def move_page(page_id):
 from myai import myai
 app.register_blueprint(myai)
 
+
 # =========================
 # START
 # =========================
